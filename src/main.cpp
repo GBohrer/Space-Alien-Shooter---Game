@@ -299,7 +299,8 @@ int main(int argc, char* argv[])
 
     // Carregamos duas imagens para serem utilizadas como textura
     LoadTextureImage("../../data/tc-earth_daymap_surface.jpg");      // TextureImage0
-    LoadTextureImage("../../data/tc-earth_nightmap_citylights.gif"); // TextureImage1
+    LoadTextureImage("../../data/material_emissive.png"); // TextureImage1
+    LoadTextureImage("../../data/detalhes-preto-e-branco-do-conceito-de-textura-da-lua.jpg");// // TextureImage1
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
@@ -414,13 +415,14 @@ int main(int argc, char* argv[])
         #define PLANE  2
 
         // Desenhamos o modelo da esfera
-        model = Matrix_Translate(-1.0f,0.0f,0.0f)
-              * Matrix_Rotate_Z(0.6f)
-              * Matrix_Rotate_X(0.2f)
-              * Matrix_Rotate_Y(g_AngleY + (float)glfwGetTime() * 0.1f);
+        model = Matrix_Translate(camera_position_c.x,camera_position_c.y,camera_position_c.z);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, SPHERE);
+        glDisable(GL_CULL_FACE);  //ajustando normais
+        glDisable(GL_DEPTH_TEST); //desabilitando z buffer
         DrawVirtualObject("the_sphere");
+        glEnable(GL_CULL_FACE);
+        glEnable(GL_DEPTH_TEST);
 
         // Desenhamos o modelo do coelho
         model = Matrix_Translate(1.0f,0.0f,0.0f)
@@ -430,7 +432,7 @@ int main(int argc, char* argv[])
         DrawVirtualObject("the_bunny");
 
         // Desenhamos o plano do chão
-        model = Matrix_Translate(0.0f,-1.1f,0.0f);
+        model = Matrix_Translate(0.0f,-1.1f,0.0f) * Matrix_Scale(5.0f,2.0f,10.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, PLANE);
         DrawVirtualObject("the_plane");

@@ -132,15 +132,19 @@ void main()
     }
 
     // Obtemos a refletância difusa a partir da leitura da imagem TextureImage0
-    vec3 Kd0 = texture(TextureImage0, vec2(U,V)).rgb;
+    vec3 Kd0 = texture(TextureImage0, vec2(U,V)).rgb; // terra
     // Obtemos a refletância difusa a partir da leitura da imagem TextureImage1
-    vec3 Kd1 = texture(TextureImage1, vec2(U,V)).rgb;
+    vec3 Kd1 = texture(TextureImage1, vec2(U,V)).rgb; //galaxia
+    vec3 Kd2 = texture(TextureImage2, vec2(U,V)).rgb; //galaxia
 
     // Equação de Iluminação
     float lambert = max(0,dot(n,l));
 
     if(object_id == SPHERE ){
-        color.rgb = Kd0 * (lambert + 0.01) + Kd1 * pow((1 - lambert), 2);
+        color.rgb =  Kd1;
+    }
+    else if(object_id == PLANE ){
+        color.rgb =  Kd2;
     }
     else{
         color.rgb = Kd0 * (lambert + 0.01);

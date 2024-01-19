@@ -6,6 +6,7 @@
 // "shader_vertex.glsl" e "main.cpp".
 in vec4 position_world;
 in vec4 normal;
+in vec4 cor_v;  //para Gouraund
 
 // Posição do vértice atual no sistema de coordenadas local do modelo.
 in vec4 position_model;
@@ -65,6 +66,15 @@ void main()
 
     // Vetor que define o sentido da câmera em relação ao ponto atual.
     vec4 v = normalize(camera_position - p);
+
+    // Vetor que define o sentido da reflexão especular ideal.
+    vec4 r = -l + 2*n*(dot(n,l)); // PREENCHA AQUI o vetor de reflexão especular ideal
+
+    // Parâmetros que definem as propriedades espectrais da superfície
+    vec3 Kd; //pegamos das texturas
+    vec3 Ks; // Refletância especular
+    vec3 Ka; // Refletância ambiente
+    float q; // Expoente especular para o modelo de iluminação de Phong
 
     // Coordenadas de textura U e V
     float U = 0.0;
@@ -143,7 +153,7 @@ void main()
     vec3 Kd0 = texture(TextureImage0, vec2(U,V)).rgb; // terra
     vec3 Kd1 = texture(TextureImage1, vec2(U,V)).rgb; //galaxia
     vec3 Kd2 = texture(TextureImage2, vec2(U,V)).rgb; //chão
-    vec3 Kd3 = texture(TextureImage3, vec2(U,V)).rgb; //gun
+    //vec3 Kd3 = texture(TextureImage3, vec2(U,V)).rgb; //gun antes de iluminação
 
     // Equação de Iluminação
     float lambert = max(0,dot(n,l));
@@ -152,13 +162,33 @@ void main()
         color.rgb =  Kd1;
     }
     else if(object_id == PLANE ){
-        color.rgb =  Kd2;
+        color.rgb = Kd2;
     }
     else if(object_id == GUN){
-        color.rgb =  Kd3;
+        color.rgb = cor_v.rgb;
     }
     else{
-        color.rgb = Kd0 * (lambert + 0.01);
+        Kd = Kd0;
+        Ks = vec3(0.3f, 0.3f, 0.3f);
+        Ka = vec3(0.0,0.0,0.0);
+        q = 20.0;
+
+        // Espectro da fonte de iluminação
+        vec3 I = vec3(1.0f,1.0f,1.0f); //espectro da fonte de luz
+
+        // Espectro da luz ambiente
+        vec3 Ia = vec3(0.2f, 0.2f, 0.2f); //espectro da luz ambiente
+
+        // Termo difuso utilizando a lei dos cossenos de Lambert
+        vec3 lambert_diffuse_term = Kd * I * lambert; // termo difuso de Lambert
+
+        // Termo ambiente
+        vec3 ambient_term = Ka * Ia; // termo ambiente
+
+        // Termo especular utilizando o modelo de iluminação de Phong
+        vec3 phong_specular_term  = Ks * I * pow(max(0,dot(r,v)),q); //  termo especular de Phong
+
+        color.rgb = lambert_diffuse_term + ambient_term + phong_specular_term;
     }
 
     // NOTE: Se você quiser fazer o rendering de objetos transparentes, é

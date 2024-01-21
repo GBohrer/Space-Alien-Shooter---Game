@@ -24,6 +24,7 @@ uniform mat4 projection;
 #define BUNNY  1
 #define PLANE  2
 #define GUN    3
+#define ALIEN  4
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -136,13 +137,7 @@ void main()
         V = (position_model.y - miny) / (maxy - miny);
 
     }
-    else if ( object_id == PLANE )
-    {
-        // Coordenadas de textura do plano, obtidas do arquivo OBJ.
-        U = texcoords.x;
-        V = texcoords.y;
-    }
-    else if (object_id == GUN)
+    else
     {
         // Coordenadas de textura do plano, obtidas do arquivo OBJ.
         U = texcoords.x;

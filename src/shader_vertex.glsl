@@ -23,6 +23,7 @@ out vec2 texcoords;
 uniform sampler2D TextureImage3;
 
 #define GUN    3
+#define ALIEN  4
 uniform int object_id;
 
 //uniform vec4 light_position; // sequiser ponto de luz
@@ -69,7 +70,7 @@ void main()
     normal = inverse(transpose(model)) * normal_coefficients;
     normal.w = 0.0;
 
-    if ( object_id == GUN )
+    if ( object_id == GUN || object_id == ALIEN)
     {
         //Iluminação Gourand ------------modelo desejado??-------------------------
         // Normal do fragmento atual, interpolada pelo rasterizador a partir das

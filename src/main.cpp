@@ -5,8 +5,10 @@
 //    INF01047 Fundamentos de Computação Gráfica
 //               Prof. Eduardo Gastal
 //
-//                   LABORATÓRIO 5
+//                   TRABALHO FINAL - 2023/02
 //
+//      00318222 - GABRIEL ALVES BOHRER
+//      00335240 - JEFFERSON RUAN BARCELOS GODINHO
 
 // Arquivos "headers" padrões de C podem ser incluídos em um
 // programa C++, sendo necessário somente adicionar o caractere
@@ -124,6 +126,8 @@ void LoadShader(const char* filename, GLuint shader_id); // Função utilizada p
 GLuint CreateGpuProgram(GLuint vertex_shader_id, GLuint fragment_shader_id); // Cria um programa de GPU
 void PrintObjModelInfo(ObjModel*); // Função para debugging
 
+GLuint BuildTrianglesForAim(float desloc_x);      // Constroi triangulos para renderizacao da mira na tela
+
 // Declaração de funções auxiliares para renderizar texto dentro da janela
 // OpenGL. Estas funções estão definidas no arquivo "textrendering.cpp".
 void TextRendering_Init();
@@ -196,15 +200,7 @@ bool g_MiddleMouseButtonPressed = false; // Análogo para botão do meio do mous
 // renderização.
 float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
 float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
-float g_CameraDistance = 3.5f; // Distância da câmera para a origem
-
-// Variáveis que controlam rotação do antebraço
-float g_ForearmAngleZ = 0.0f;
-float g_ForearmAngleX = 0.0f;
-
-// Variáveis que controlam translação do torso
-float g_TorsoPositionX = 0.0f;
-float g_TorsoPositionY = 0.0f;
+float g_CameraDistance = 10.0f; // Distância da câmera para a origem
 
 // Variável que controla o tipo de projeção utilizada: perspectiva ou ortográfica.
 bool g_UsePerspectiveProjection = true;
@@ -253,7 +249,7 @@ int main(int argc, char* argv[])
     // Criamos uma janela do sistema operacional, com 800 colunas e 600 linhas
     // de pixels, e com título "INF01047 ...".
     GLFWwindow* window;
-    window = glfwCreateWindow(800, 600, "INF01047 - 00335240 - Jefferson Ruan Barcelos Godinho", NULL, NULL);
+    window = glfwCreateWindow(800, 600, "INF01047 - Space Alien Shooter", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -292,33 +288,40 @@ int main(int argc, char* argv[])
 
     printf("GPU: %s, %s, OpenGL %s, GLSL %s\n", vendor, renderer, glversion, glslversion);
 
+    // Contrucao da mira
+    GLuint vertex_array_object_aim = BuildTrianglesForAim(0);
+
     // Carregamos os shaders de vértices e de fragmentos que serão utilizados
     // para renderização. Veja slides 180-200 do documento Aula_03_Rendering_Pipeline_Grafico.pdf.
     //
     LoadShadersFromFiles();
 
     // Carregamos duas imagens para serem utilizadas como textura
-    LoadTextureImage("../../data/tc-earth_daymap_surface.jpg");      // TextureImage0
-    LoadTextureImage("../../data/material_emissive.png"); // TextureImage1
-    LoadTextureImage("../../data/detalhes-preto-e-branco-do-conceito-de-textura-da-lua.jpg");// // TextureImage2
-    LoadTextureImage("../../data/Gun.jpg");
+    LoadTextureImage("../../data/alien.png");                                                   // TextureImage0
+    LoadTextureImage("../../data/material_emissive.png");                                       // TextureImage1
+    LoadTextureImage("../../data/detalhes-preto-e-branco-do-conceito-de-textura-da-lua.jpg");   // TextureImage2
+    LoadTextureImage("../../data/Gun.jpg");                                                     // TextureImage3
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
     ComputeNormals(&spheremodel);
     BuildTrianglesAndAddToVirtualScene(&spheremodel);
-
+/*
     ObjModel bunnymodel("../../data/bunny.obj");
     ComputeNormals(&bunnymodel);
     BuildTrianglesAndAddToVirtualScene(&bunnymodel);
-
+*/
     ObjModel planemodel("../../data/plane.obj");
     ComputeNormals(&planemodel);
     BuildTrianglesAndAddToVirtualScene(&planemodel);
 
-    ObjModel gunmodel("../../data/gun.obj");      //aqui arma
+    ObjModel gunmodel("../../data/gun.obj");
     ComputeNormals(&gunmodel);
     BuildTrianglesAndAddToVirtualScene(&gunmodel);
+
+    ObjModel alienmodel("../../data/alien.obj");
+    ComputeNormals(&alienmodel);
+    BuildTrianglesAndAddToVirtualScene(&alienmodel);
 
     if ( argc > 1 )
     {
@@ -342,11 +345,7 @@ int main(int argc, char* argv[])
     {
         // Aqui executamos as operações de renderização
 
-        // Definimos a cor do "fundo" do framebuffer como branco.  Tal cor é
-        // definida como coeficientes RGBA: Red, Green, Blue, Alpha; isto é:
-        // Vermelho, Verde, Azul, Alpha (valor de transparência).
-        // Conversaremos sobre sistemas de cores nas aulas de Modelos de Iluminação.
-        //
+        // Definimos a cor do "fundo" do framebuffer como branco.
         //           R     G     B     A
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -419,6 +418,7 @@ int main(int argc, char* argv[])
         #define BUNNY  1
         #define PLANE  2
         #define GUN    3
+        #define ALIEN  4
 
         // Desenhamos o modelo da esfera SkyBox
         model = Matrix_Translate(camera_position_c.x,camera_position_c.y,camera_position_c.z);
@@ -429,38 +429,57 @@ int main(int argc, char* argv[])
         DrawVirtualObject("the_sphere");
         glEnable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
-
+/*
         // Desenhamos o modelo do coelho
         model = Matrix_Translate(1.0f,1.0f,-2.0f)
               * Matrix_Rotate_X(g_AngleX + (float)glfwGetTime() * 0.1f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, BUNNY);
         DrawVirtualObject("the_bunny");
-
+*/
         // Desenhamos o plano do chão
         model = Matrix_Translate(0.0f,-1.0f,0.0f) * Matrix_Scale(80.0f,2.0f,80.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, PLANE);
         DrawVirtualObject("the_plane");
 
-        //desenha o modelo da arma
-        model = Matrix_Translate(1.0f,-1.0f,0.0f)* Matrix_Scale(0.1f,0.1f,0.1f)* Matrix_Rotate_X(-1.7f);
+        /// Desenhamos o modelo da arma
+        model = Matrix_Translate(0.0f,0.0f,0.0f)* Matrix_Scale(0.1f,0.1f,0.1f)
+        * Matrix_Rotate_X(-1.7f)* Matrix_Rotate_Z(1.0f)
+        * Matrix_Rotate_Z(g_AngleX + (float)glfwGetTime() * 0.5f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, GUN);
         DrawVirtualObject("11683_gun");
 
 
+        /// Desenhamos os aliens no cenario
+            // Matrix_Translate: coordenadas aleatorias para spawnar
+            // Matrix_Rotate: manter direcao sempre para o ponto em que a camera está (jogador)
+        model = Matrix_Translate(0.0f,6.0f,0.0f) * Matrix_Scale(5.0f,5.0f,5.0f) * Matrix_Rotate_X(-1.0f);
+        //Matrix_Rotate_Y(g_AngleY + (float)glfwGetTime() * 0.5f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, ALIEN);
+        DrawVirtualObject("object_0");
 
-        // Imprimimos na tela os ângulos de Euler que controlam a rotação do
-        // terceiro cubo.
-        TextRendering_ShowEulerAngles(window);
+        model = Matrix_Translate(4.0f,6.0f,4.0f) * Matrix_Scale(5.0f,5.0f,5.0f) * Matrix_Rotate_X(-1.0f);
+        //Matrix_Rotate_Y(g_AngleY + (float)glfwGetTime() * 0.5f);
+        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        glUniform1i(g_object_id_uniform, ALIEN);
+        DrawVirtualObject("object_0");
 
-        // Imprimimos na informação sobre a matriz de projeção sendo utilizada.
-        TextRendering_ShowProjection(window);
+        /// Desenhamos o HUD na tela
+        glDisable(GL_DEPTH_TEST);
 
-        // Imprimimos na tela informação sobre o número de quadros renderizados
-        // por segundo (frames per second).
-        TextRendering_ShowFramesPerSecond(window);
+        // Desenhar a mira
+        glBindVertexArray(vertex_array_object_aim);
+        glDrawElements(GL_TRIANGLE_STRIP, 34, GL_UNSIGNED_BYTE, 0);
+
+        // "Desligamos" o VAO, evitando assim que operações posteriores venham a
+        // alterar o mesmo. Isso evita bugs.
+        glBindVertexArray(0);
+
+        glEnable(GL_DEPTH_TEST);
+
 
         // O framebuffer onde OpenGL executa as operações de renderização não
         // é o mesmo que está sendo mostrado para o usuário, caso contrário
@@ -702,6 +721,169 @@ void ComputeNormals(ObjModel* model)
         model->attrib.normals[3*i + 1] = n.y;
         model->attrib.normals[3*i + 2] = n.z;
     }
+}
+
+GLuint BuildTrianglesForAim(float desloc_x)
+{
+
+    GLfloat NDC_coefficients2[] = {
+    //    X      Y     Z     W
+desloc_x + 0.175f, 0.0f, 0.0f, 1.0f,
+desloc_x + 0.115f, 0.046f, 0.0f, 1.0f,
+desloc_x + 0.16f, 0.065f, 0.0f, 1.0f,
+desloc_x + 0.0875f, 0.0875f, 0.0f, 1.0f,
+desloc_x + 0.1225f, 0.1225f, 0.0f, 1.0f,
+desloc_x + 0.046f, 0.115f, 0.0f, 1.0f,
+desloc_x + 0.0625f, 0.16f, 0.0f, 1.0f,
+desloc_x + 0.0f, 0.125f, 0.0f, 1.0f,
+desloc_x + 0.0f, 0.175f, 0.0f, 1.0f,
+desloc_x -0.046f, 0.115f, 0.0f, 1.0f,
+desloc_x -0.065f, 0.16f, 0.0f, 1.0f,
+desloc_x -0.0875f, 0.0875f, 0.0f, 1.0f,
+desloc_x -0.1225f, 0.1225f, 0.0f, 1.0f,
+desloc_x -0.115f, 0.046f, 0.0f, 1.0f,
+desloc_x -0.16f, 0.065f, 0.0f, 1.0f,
+desloc_x -0.125f, 0.0f, 0.0f, 1.0f,
+desloc_x -0.175f, 0.0f, 0.0f, 1.0f,
+desloc_x -0.115f, -0.046f, 0.0f, 1.0f,
+desloc_x -0.16f, -0.065f, 0.0f, 1.0f,
+desloc_x -0.0875f, -0.0875f, 0.0f, 1.0f,
+desloc_x -0.1225f, -0.1225f, 0.0f, 1.0f,
+desloc_x -0.046f, -0.115f, 0.0f, 1.0f,
+desloc_x -0.065f, -0.16f, 0.0f, 1.0f,
+desloc_x +0.0f, -0.125f, 0.0f, 1.0f,
+desloc_x +0.0f, -0.175f, 0.0f, 1.0f,
+desloc_x +0.046f, -0.115f, 0.0f, 1.0f,
+desloc_x +0.065f, -0.16f, 0.0f, 1.0f,
+desloc_x +0.0875f, -0.0875f, 0.0f, 1.0f,
+desloc_x +0.1225f, -0.1225f, 0.0f, 1.0f,
+desloc_x +0.115f, -0.046f, 0.0f, 1.0f,
+desloc_x +0.16f, -0.065f, 0.0f, 1.0f,
+desloc_x +0.125f, 0.0f, 0.0f, 1.0f
+
+    };
+
+    // Criamos o identificador (ID) de um Vertex Buffer Object (VBO
+    // para armazenarmos um atributo: posição (coeficientes NDC definidos acima).
+    GLuint VBO_NDC_coefficients_id2;
+    glGenBuffers(1, &VBO_NDC_coefficients_id2);
+
+    // Criamos o identificador (ID) de um Vertex Array Object (VAO).  Um VAO
+    // contém a definição de vários atributos de um certo conjunto de vértices;
+    // isto é, um VAO irá conter ponteiros para vários VBOs.
+    GLuint vertex_array_object_id2;
+    glGenVertexArrays(1, &vertex_array_object_id2);
+
+    // "Ligamos" o VAO ("bind"). Informamos que iremos atualizar o VAO cujo ID
+    // está contido na variável "vertex_array_object_id".
+    glBindVertexArray(vertex_array_object_id2);
+
+    // "Ligamos" o VBO ("bind"). Informamos que o VBO cujo ID está contido na
+    // variável VBO_NDC_coefficients_id será modificado a seguir. A
+    // constante "GL_ARRAY_BUFFER" informa que esse buffer é de fato um VBO, e
+    // irá conter atributos de vértices.
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_NDC_coefficients_id2);
+
+    // Alocamos memória para o VBO "ligado" acima.
+    glBufferData(GL_ARRAY_BUFFER, sizeof(NDC_coefficients2), NULL, GL_STATIC_DRAW);
+
+    // Finalmente, copiamos os valores do array NDC_coefficients para dentro do VBO
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(NDC_coefficients2), NDC_coefficients2);
+
+    // Precisamos então informar um índice de "local" ("location"), o qual será
+    // utilizado no shader "shader_vertex.glsl" para acessar os valores
+    // armazenados no VBO "ligado" acima. Também, informamos a dimensão (número de
+    // coeficientes) destes atributos. Como em nosso caso são coordenadas NDC
+    // homogêneas, temos quatro coeficientes por vértice (X,Y,Z,W). Isto define
+    // um tipo de dado chamado de "vec4" em "shader_vertex.glsl": um vetor com
+    // quatro coeficientes. Finalmente, informamos que os dados estão em ponto
+    // flutuante com 32 bits (GL_FLOAT).
+    GLuint location = 0; // "(location = 0)" em "shader_vertex.glsl"
+    GLint  number_of_dimensions = 4; // vec4 em "shader_vertex.glsl"
+    glVertexAttribPointer(location, number_of_dimensions, GL_FLOAT, GL_FALSE, 0, 0);
+
+    // "Ativamos" os atributos. Informamos que os atributos com índice de local
+    // definido acima, na variável "location", deve ser utilizado durante o
+    // rendering.
+    glEnableVertexAttribArray(location);
+
+    // "Desligamos" o VBO, evitando assim que operações posteriores venham a
+    // alterar o mesmo. Isto evita bugs.
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    GLfloat color_coefficients2[] = {
+    //  R     G     B     A
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f
+    };
+
+    GLuint VBO_color_coefficients_id2;
+    glGenBuffers(1, &VBO_color_coefficients_id2);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_color_coefficients_id2);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(color_coefficients2), NULL, GL_STATIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(color_coefficients2), color_coefficients2);
+    location = 1; // "(location = 1)" em "shader_vertex.glsl"
+    number_of_dimensions = 4; // vec4 em "shader_vertex.glsl"
+    glVertexAttribPointer(location, number_of_dimensions, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(location);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    // Este vetor "indices" define a TOPOLOGIA
+    GLubyte indices2[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,0,1 }; // GLubyte: valores entre 0 e 255 (8 bits sem sinal).
+
+    // Criamos um buffer OpenGL para armazenar os índices acima
+    GLuint indices_id2;
+    glGenBuffers(1, &indices_id2);
+
+    // "Ligamos" o buffer. Note que o tipo agora é GL_ELEMENT_ARRAY_BUFFER.
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices_id2);
+
+    // Alocamos memória para o buffer.
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices2), NULL, GL_STATIC_DRAW);
+
+    // Copiamos os valores do array indices[] para dentro do buffer.
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, sizeof(indices2), indices2);
+
+    // "Desligamos" o VAO, evitando assim que operações posteriores venham a
+    // alterar o mesmo. Isso evita bugs.
+    glBindVertexArray(0);
+
+    // Retornamos o ID do VAO. Isso é tudo que será necessário para renderizar
+    // os triângulos definidos acima. Veja a chamada glDrawElements() em main().
+    return vertex_array_object_id2;
+
 }
 
 // Constrói triângulos para futura renderização a partir de um ObjModel.
@@ -1118,10 +1300,6 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
         float dx = xpos - g_LastCursorPosX;
         float dy = ypos - g_LastCursorPosY;
 
-        // Atualizamos parâmetros da antebraço com os deslocamentos
-        g_ForearmAngleZ -= 0.01f*dx;
-        g_ForearmAngleX += 0.01f*dy;
-
         // Atualizamos as variáveis globais para armazenar a posição atual do
         // cursor como sendo a última posição conhecida do cursor.
         g_LastCursorPosX = xpos;
@@ -1133,10 +1311,6 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
         // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
         float dx = xpos - g_LastCursorPosX;
         float dy = ypos - g_LastCursorPosY;
-
-        // Atualizamos parâmetros da antebraço com os deslocamentos
-        g_TorsoPositionX += 0.01f*dx;
-        g_TorsoPositionY -= 0.01f*dy;
 
         // Atualizamos as variáveis globais para armazenar a posição atual do
         // cursor como sendo a última posição conhecida do cursor.
@@ -1150,6 +1324,7 @@ void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
     // Atualizamos a distância da câmera para a origem utilizando a
     // movimentação da "rodinha", simulando um ZOOM.
+
     g_CameraDistance -= 0.1f*yoffset;
 
     // Uma câmera look-at nunca pode estar exatamente "em cima" do ponto para
@@ -1157,6 +1332,7 @@ void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
     // definição do sistema de coordenadas da câmera. Isto é, a variável abaixo
     // nunca pode ser zero. Versões anteriores deste código possuíam este bug,
     // o qual foi detectado pelo aluno Vinicius Fraga (2017/2).
+
     const float verysmallnumber = std::numeric_limits<float>::epsilon();
     if (g_CameraDistance < verysmallnumber)
         g_CameraDistance = verysmallnumber;
@@ -1208,10 +1384,6 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         g_AngleX = 0.0f;
         g_AngleY = 0.0f;
         g_AngleZ = 0.0f;
-        g_ForearmAngleX = 0.0f;
-        g_ForearmAngleZ = 0.0f;
-        g_TorsoPositionX = 0.0f;
-        g_TorsoPositionY = 0.0f;
     }
 
     // Se o usuário apertar a tecla P, utilizamos projeção perspectiva.

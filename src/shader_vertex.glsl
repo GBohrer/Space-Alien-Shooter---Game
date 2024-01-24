@@ -1,5 +1,6 @@
 #version 330 core
 
+
 // Atributos de vértice recebidos como entrada ("in") pelo Vertex Shader.
 // Veja a função BuildTrianglesAndAddToVirtualScene() em "main.cpp".
 layout (location = 0) in vec4 model_coefficients;
@@ -43,7 +44,19 @@ void main()
     // deste Vertex Shader, a placa de vídeo (GPU) fará a divisão por W. Veja
     // slides 41-67 e 69-86 do documento Aula_09_Projecoes.pdf.
 
-    gl_Position = projection * view * model * model_coefficients;
+    if(object_id == GUN){
+        mat4 viewg;
+
+        viewg[0][0] = 1.0f; viewg[0][1] = 0.0f; viewg[0][2] = 0.0f; viewg[0][3] = 0.0f;
+        viewg[1][0] = 0.0f; viewg[1][1] = 1.0f; viewg[1][2] = 0.0f; viewg[1][3] = 0.0f;
+        viewg[2][0] = 0.0f; viewg[2][1] = 0.0f; viewg[2][2] = 1.0f; viewg[2][3] = 0.0f;
+        viewg[3][0] = 0.0f; viewg[3][1] = 0.0f; viewg[3][2] = 0.0f; viewg[3][3] = 1.0f;
+
+        gl_Position = projection * viewg * model * model_coefficients;
+    }
+    else{
+        gl_Position = projection * view * model * model_coefficients;
+    }
 
     // Como as variáveis acima  (tipo vec4) são vetores com 4 coeficientes,
     // também é possível acessar e modificar cada coeficiente de maneira
@@ -70,7 +83,7 @@ void main()
     normal = inverse(transpose(model)) * normal_coefficients;
     normal.w = 0.0;
 
-    if ( object_id == GUN || object_id == ALIEN)
+    if ( object_id == GUN)
     {
         //Iluminação Gourand ------------modelo desejado??-------------------------
         // Normal do fragmento atual, interpolada pelo rasterizador a partir das
@@ -81,7 +94,7 @@ void main()
 
         vec4 n = normalize(normal);
         // Vetor que define o sentido da fonte de luz em relação ao ponto atual.
-        vec4 l = normalize(vec4(-5.0,2.0,0.0,0.0)); //fonte de luz?
+        vec4 l = normalize(vec4(-5.0,4.0,0.0,0.0)); //fonte de luz
         float lambert = max(0,dot(n,l));
         // Vetor que define o sentido da câmera em relação ao ponto atual.
         vec4 v = normalize(camera_position - p);
@@ -100,9 +113,9 @@ void main()
         V = texcoords.y;
 
         vec3 Kd3 = texture(TextureImage3, vec2(U,V)).rgb; //gun
-        vec3 Ks = vec3(0.3f, 0.3f, 0.3f);
+        vec3 Ks = vec3(0.2f, 0.2f, 0.2f);
         vec3 Ka = vec3(0.0,0.0,0.0);
-        vec3 I = vec3(1.0f,1.0f,1.0f); //espectro da fonte de luz
+        vec3 I = vec3(0.8f,0.8f,0.8f); //espectro da fonte de luz
         vec3 Ia = vec3(0.2f, 0.2f, 0.2f);// Espectro da luz ambiente
 
         vec3 lambert_diffuse_term = Kd3 * I * max(0,dot(n,l));

@@ -203,16 +203,16 @@ float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 10.0f; // Distância da câmera para a origem
 
 //Area de variaveis camera livre-------------------------------------------
-bool move_camera_W=false;
-bool move_camera_A=false;
-bool move_camera_S=false;
-bool move_camera_D=false;
-bool move_camera_AW=false;
-bool move_camera_WD=false;
-bool move_camera_AS=false;
-bool move_camera_SD=false;
-float cam_speed=0.2;
-glm::vec4 camera_position_general=glm::vec4(0.0f,0.0f,1.0f,1.0f);
+bool move_camera_W  = false;
+bool move_camera_A  = false;
+bool move_camera_S  = false;
+bool move_camera_D  = false;
+bool move_camera_AW = false;
+bool move_camera_WD = false;
+bool move_camera_AS = false;
+bool move_camera_SD = false;
+float cam_speed     = 0.2;
+glm::vec4 camera_position_general = glm::vec4(0.0f,0.0f,1.0f,1.0f);
 //---------------------------------------------------------------------
 
 // Variável que controla o tipo de projeção utilizada: perspectiva ou ortográfica.
@@ -232,6 +232,22 @@ GLint g_bbox_max_uniform;
 
 // Número de texturas carregadas pela função LoadTextureImage()
 GLuint g_NumLoadedTextures = 0;
+
+// Atributos Alien
+int Alien_In_Game           = 0;
+int Alien_Spawn_Qtd         = 4;
+float Alien_Speed_mod       = 1.0f;
+int Alien_Health            = 100;
+float Alien_Spawn_Min_Range = 50.0f;
+
+// Lista com os 4 modelos (Matrix_Translate) dos aliens atuais no jogo
+glm::mat4 Alien_Model = Matrix_Identity();
+//std::list<glm::mat4> Alien_Models;
+
+// Atributos Player
+int Player_Kill_Count   = 0;
+float Player_Speed_mod  = 1.0f;
+
 
 int main(int argc, char* argv[])
 {
@@ -315,6 +331,7 @@ int main(int argc, char* argv[])
     LoadTextureImage("../../data/detalhes-preto-e-branco-do-conceito-de-textura-da-lua.jpg");   // TextureImage2
     LoadTextureImage("../../data/Gun.jpg");                                                     // TextureImage3
 
+
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
     ComputeNormals(&spheremodel);
@@ -388,35 +405,35 @@ int main(int argc, char* argv[])
         glm::vec4 w = -camera_view_vector/(norm(camera_view_vector));
         glm::vec4 u = crossproduct(camera_up_vector, camera_view_vector)/(norm(crossproduct(camera_up_vector, camera_view_vector)));
 
-        //controle movimentação ------------------------------------------
+        // Controle da movimentação ------------------------------------------
 
         if(move_camera_W){
-            camera_position_general = camera_position_general -w*cam_speed;
+            camera_position_general -= w * cam_speed;
         };
         if(move_camera_A){
-            camera_position_general = camera_position_general +u *cam_speed;
+            camera_position_general += u * cam_speed;
         };
         if(move_camera_S){
-            camera_position_general = camera_position_general +w *cam_speed;
+            camera_position_general += w * cam_speed;
         };
         if(move_camera_D){
-            camera_position_general = camera_position_general -u *cam_speed;
+            camera_position_general -= u * cam_speed;
         };
         if(move_camera_AW){
-            camera_position_general = camera_position_general -w*cam_speed;
-            camera_position_general = camera_position_general +u *cam_speed;
+            camera_position_general -= w * cam_speed;
+            camera_position_general += u * cam_speed;
         };
         if(move_camera_WD){
-            camera_position_general = camera_position_general -w*cam_speed;
-            camera_position_general = camera_position_general -u *cam_speed;
+            camera_position_general -= w * cam_speed;
+            camera_position_general += u * cam_speed;
         };
         if(move_camera_AS){
-            camera_position_general = camera_position_general +w *cam_speed;
-            camera_position_general = camera_position_general +u *cam_speed;
+            camera_position_general += w * cam_speed;
+            camera_position_general += u * cam_speed;
         };
         if(move_camera_SD){
-            camera_position_general = camera_position_general +w *cam_speed;
-            camera_position_general = camera_position_general -u *cam_speed;
+            camera_position_general += w * cam_speed;
+            camera_position_general -= u * cam_speed;
         };
 
         //-------------------------------------------------------------
@@ -431,28 +448,13 @@ int main(int argc, char* argv[])
         // Note que, no sistema de coordenadas da câmera, os planos near e far
         // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
         float nearplane = -0.1f;  // Posição do "near plane"
-        float farplane  = -10.0f*10; // Posição do "far plane"
+        float farplane  = -10.0f*15; // Posição do "far plane"
 
-        if (g_UsePerspectiveProjection)
-        {
-            // Projeção Perspectiva.
-            // Para definição do field of view (FOV), veja slides 205-215 do documento Aula_09_Projecoes.pdf.
-            float field_of_view = 3.141592 / 3.0f;
-            projection = Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
-        }
-        else
-        {
-            // Projeção Ortográfica.
-            // Para definição dos valores l, r, b, t ("left", "right", "bottom", "top"),
-            // PARA PROJEÇÃO ORTOGRÁFICA veja slides 219-224 do documento Aula_09_Projecoes.pdf.
-            // Para simular um "zoom" ortográfico, computamos o valor de "t"
-            // utilizando a variável g_CameraDistance.
-            float t = 1.5f*g_CameraDistance/2.5f;
-            float b = -t;
-            float r = t*g_ScreenRatio;
-            float l = -r;
-            projection = Matrix_Orthographic(l, r, b, t, nearplane, farplane);
-        }
+
+        // Projeção Perspectiva.
+        // Para definição do field of view (FOV), veja slides 205-215 do documento Aula_09_Projecoes.pdf.
+        float field_of_view = 3.141592 / 3.0f;
+        projection = Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
 
         glm::mat4 model = Matrix_Identity(); // Transformação identidade de modelagem
 
@@ -468,7 +470,9 @@ int main(int argc, char* argv[])
         #define GUN    3
         #define ALIEN  4
 
-        // Desenhamos o modelo da esfera SkyBox
+
+    /// RENDERIZAÇÃO DO MODELO DA ESFERA (SkyBox)
+
         model = Matrix_Translate(camera_position_general.x,camera_position_general.y,camera_position_general.z);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, SPHERE);
@@ -477,44 +481,76 @@ int main(int argc, char* argv[])
         DrawVirtualObject("the_sphere");
         glEnable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
-/*
-        // Desenhamos o modelo do coelho
-        model = Matrix_Translate(1.0f,1.0f,-2.0f)
-              * Matrix_Rotate_X(g_AngleX + (float)glfwGetTime() * 0.1f);
-        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, BUNNY);
-        DrawVirtualObject("the_bunny");
-*/
-        // Desenhamos o plano do chão
+
+    /// RENDERIZAÇÃO DO PLANO DO CHÃO
+
         model = Matrix_Translate(0.0f,-1.0f,0.0f) * Matrix_Scale(80.0f,2.0f,80.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, PLANE);
         DrawVirtualObject("the_plane");
 
-        /// Desenhamos o modelo da arma
-        model = Matrix_Translate(0.0f,0.0f,0.0f)* Matrix_Scale(0.1f,0.1f,0.1f)
-        * Matrix_Rotate_X(-1.7f)* Matrix_Rotate_Z(1.0f)
-        * Matrix_Rotate_Z(g_AngleX + (float)glfwGetTime() * 0.5f);
+    /// RENDERIZAÇÃO DO MODELO DA ARMA
+        model = Matrix_Translate(1.3f,-1.0f,-2.5f)* Matrix_Scale(0.1f,0.1f,0.1f) *
+        Matrix_Rotate_Y(1.7f) *
+        Matrix_Rotate_X(-1.5f)*
+        Matrix_Rotate_Z(1.7f) ;
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, GUN);
         DrawVirtualObject("11683_gun");
 
+    //Matrix_Rotate_Z(g_AngleX + (float)glfwGetTime() * 0.5f)
 
-        /// Desenhamos os aliens no cenario
-            // Matrix_Translate: coordenadas aleatorias para spawnar
-            // Matrix_Rotate: manter direcao sempre para o ponto em que a camera está (jogador)
-        model = Matrix_Translate(0.0f,6.0f,0.0f) * Matrix_Scale(5.0f,5.0f,5.0f) * Matrix_Rotate_X(-1.0f);
-        //Matrix_Rotate_Y(g_AngleY + (float)glfwGetTime() * 0.5f);
-        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, ALIEN);
-        DrawVirtualObject("object_0");
+    /// RENDERIZAÇÃO ALIENS
 
-        model = Matrix_Translate(4.0f,6.0f,4.0f) * Matrix_Scale(5.0f,5.0f,5.0f) * Matrix_Rotate_X(-1.0f);
-        //Matrix_Rotate_Y(g_AngleY + (float)glfwGetTime() * 0.5f);
-        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, ALIEN);
-        DrawVirtualObject("object_0");
+        // Gera uma nova posicao inicial aleatoria se a quantidade de aliens no jogo for menor que o desejado.
+        // Guarda esta posicao (Matrix_Translate) em Alien_Models.
+        while (Alien_In_Game < Alien_Spawn_Qtd){
 
+            int Spawn_Side = rand() % 4;
+            float Alien_spawn_desloc = rand()%100+1 - rand()%200+1;
+
+            switch(Spawn_Side){
+                case 0:
+                    model = Matrix_Translate( camera_position_general.x + Alien_Spawn_Min_Range, 2.0f, camera_position_general.z + Alien_spawn_desloc);
+                    break;
+
+                case 1:
+                    model = Matrix_Translate( camera_position_general.x+ Alien_spawn_desloc, 2.0f, camera_position_general.z + Alien_Spawn_Min_Range);
+                    break;
+
+                case 2:
+                    model = Matrix_Translate( -Alien_Spawn_Min_Range + camera_position_general.x, 2.0f, camera_position_general.z + Alien_spawn_desloc);
+                    break;
+
+                case 3:
+                    model = Matrix_Translate( Alien_spawn_desloc + camera_position_general.x, 2.0f, -Alien_Spawn_Min_Range + camera_position_general.z);
+                    break;
+
+                default:
+                    model = Matrix_Translate( 0.0f, 2.0f, 0.0f);
+                    break;
+                }
+
+            model *= Matrix_Scale(10.0f,10.0f,10.0f);
+
+            // Fazer um array/list para armazenar cada modelo de alien (começo do programa com 4 models)
+            // Sempre que Alien_In_Game diminuir, gera uma nova posicao para um novo alien.
+            Alien_Model = model;
+
+            Alien_In_Game++;
+        }
+
+        // Desenha os aliens atuais
+        for (int d = 0; d < Alien_Spawn_Qtd; d++){
+
+            //                                        Acessar o Alien_Models[d] ----|
+            //                                                                      V
+            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(Alien_Model));
+            glUniform1i(g_object_id_uniform, ALIEN);
+            DrawVirtualObject("object_0");
+        }
+
+/*
         /// Desenhamos o HUD na tela
         glDisable(GL_DEPTH_TEST);
 
@@ -527,7 +563,10 @@ int main(int argc, char* argv[])
         glBindVertexArray(0);
 
         glEnable(GL_DEPTH_TEST);
+*/
 
+
+        TextRendering_ShowFramesPerSecond(window);
 
         // O framebuffer onde OpenGL executa as operações de renderização não
         // é o mesmo que está sendo mostrado para o usuário, caso contrário
@@ -1434,18 +1473,6 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         g_AngleZ = 0.0f;
     }
 
-    // Se o usuário apertar a tecla P, utilizamos projeção perspectiva.
-    if (key == GLFW_KEY_P && action == GLFW_PRESS)
-    {
-        g_UsePerspectiveProjection = true;
-    }
-
-    // Se o usuário apertar a tecla O, utilizamos projeção ortográfica.
-    if (key == GLFW_KEY_O && action == GLFW_PRESS)
-    {
-        g_UsePerspectiveProjection = false;
-    }
-
     // Se o usuário apertar a tecla H, fazemos um "toggle" do texto informativo mostrado na tela.
     if (key == GLFW_KEY_H && action == GLFW_PRESS)
     {
@@ -1563,35 +1590,6 @@ void TextRendering_ShowModelViewProjection(
     TextRendering_PrintMatrixVectorProductMoreDigits(window, viewport_mapping, p_ndc, -1.0f, 1.0f-26*pad, 1.0f);
 }
 
-// Escrevemos na tela os ângulos de Euler definidos nas variáveis globais
-// g_AngleX, g_AngleY, e g_AngleZ.
-void TextRendering_ShowEulerAngles(GLFWwindow* window)
-{
-    if ( !g_ShowInfoText )
-        return;
-
-    float pad = TextRendering_LineHeight(window);
-
-    char buffer[80];
-    snprintf(buffer, 80, "Euler Angles rotation matrix = Z(%.2f)*Y(%.2f)*X(%.2f)\n", g_AngleZ, g_AngleY, g_AngleX);
-
-    TextRendering_PrintString(window, buffer, -1.0f+pad/10, -1.0f+2*pad/10, 1.0f);
-}
-
-// Escrevemos na tela qual matriz de projeção está sendo utilizada.
-void TextRendering_ShowProjection(GLFWwindow* window)
-{
-    if ( !g_ShowInfoText )
-        return;
-
-    float lineheight = TextRendering_LineHeight(window);
-    float charwidth = TextRendering_CharWidth(window);
-
-    if ( g_UsePerspectiveProjection )
-        TextRendering_PrintString(window, "Perspective", 1.0f-13*charwidth, -1.0f+2*lineheight/10, 1.0f);
-    else
-        TextRendering_PrintString(window, "Orthographic", 1.0f-13*charwidth, -1.0f+2*lineheight/10, 1.0f);
-}
 
 // Escrevemos na tela o número de quadros renderizados por segundo (frames per
 // second).

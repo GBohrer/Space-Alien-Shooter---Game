@@ -183,11 +183,6 @@ std::stack<glm::mat4>  g_MatrixStack;
 // Razão de proporção da janela (largura/altura). Veja função FramebufferSizeCallback().
 float g_ScreenRatio = 1.0f;
 
-// Ângulos de Euler que controlam a rotação de um dos cubos da cena virtual
-float g_AngleX = 0.0f;
-float g_AngleY = 0.0f;
-float g_AngleZ = 0.0f;
-
 // "g_LeftMouseButtonPressed = true" se o usuário está com o botão esquerdo do mouse
 // pressionado no momento atual. Veja função MouseButtonCallback().
 bool g_LeftMouseButtonPressed = false;
@@ -207,12 +202,10 @@ bool move_camera_W  = false;
 bool move_camera_A  = false;
 bool move_camera_S  = false;
 bool move_camera_D  = false;
-bool move_camera_AW = false;
-bool move_camera_WD = false;
-bool move_camera_AS = false;
-bool move_camera_SD = false;
-float cam_speed     = 0.2;
-glm::vec4 camera_position_general = glm::vec4(0.0f,0.0f,1.0f,1.0f);
+bool move_up        = false;
+bool move_down      = false;
+float cam_speed     = 0.3;
+glm::vec4 camera_position_general = glm::vec4(0.0f,8.0f,0.0f,1.0f);
 //---------------------------------------------------------------------
 
 // Variável que controla o tipo de projeção utilizada: perspectiva ou ortográfica.
@@ -233,16 +226,18 @@ GLint g_bbox_max_uniform;
 // Número de texturas carregadas pela função LoadTextureImage()
 GLuint g_NumLoadedTextures = 0;
 
+/// VARIÁVEIS GAMEPLAY
+
 // Atributos Alien
 int Alien_In_Game           = 0;
 int Alien_Spawn_Qtd         = 4;
 float Alien_Speed_mod       = 1.0f;
 int Alien_Health            = 100;
-float Alien_Spawn_Min_Range = 50.0f;
+float Alien_Spawn_Min_Range = 100.0f;
 
 // Lista com os 4 modelos (Matrix_Translate) dos aliens atuais no jogo
-glm::mat4 Alien_Model = Matrix_Identity();
-//std::list<glm::mat4> Alien_Models;
+std::vector<float> Alien_Models_X;
+std::vector<float> Alien_Models_Z;
 
 // Atributos Player
 int Player_Kill_Count   = 0;
@@ -325,7 +320,9 @@ int main(int argc, char* argv[])
     //
     LoadShadersFromFiles();
 
-    // Carregamos duas imagens para serem utilizadas como textura
+
+    /// LOAD DE TEXTURAS E CONSTRUÇÃO DE OBJETOS
+
     LoadTextureImage("../../data/alien.png");                                                   // TextureImage0
     LoadTextureImage("../../data/material_emissive.png");                                       // TextureImage1
     LoadTextureImage("../../data/detalhes-preto-e-branco-do-conceito-de-textura-da-lua.jpg");   // TextureImage2
@@ -408,33 +405,27 @@ int main(int argc, char* argv[])
         // Controle da movimentação ------------------------------------------
 
         if(move_camera_W){
-            camera_position_general -= w * cam_speed;
-        };
+            camera_position_general.x -= w.x * cam_speed;
+            camera_position_general.z -= w.z * cam_speed;
+        }
         if(move_camera_A){
             camera_position_general += u * cam_speed;
-        };
+        }
         if(move_camera_S){
-            camera_position_general += w * cam_speed;
-        };
+            camera_position_general.x += w.x * cam_speed;
+            camera_position_general.z += w.z * cam_speed;
+        }
         if(move_camera_D){
             camera_position_general -= u * cam_speed;
-        };
-        if(move_camera_AW){
-            camera_position_general -= w * cam_speed;
-            camera_position_general += u * cam_speed;
-        };
-        if(move_camera_WD){
-            camera_position_general -= w * cam_speed;
-            camera_position_general += u * cam_speed;
-        };
-        if(move_camera_AS){
-            camera_position_general += w * cam_speed;
-            camera_position_general += u * cam_speed;
-        };
-        if(move_camera_SD){
-            camera_position_general += w * cam_speed;
-            camera_position_general -= u * cam_speed;
-        };
+        }
+
+        /// IMPLEMENTAR GRAVIDADE (CURVAS DE BEZIER ?)
+        if(move_up) {
+            camera_position_general += camera_up_vector * cam_speed ;
+        }
+        if(move_down) {
+            camera_position_general += -camera_up_vector * cam_speed ;
+        }
 
         //-------------------------------------------------------------
 
@@ -484,16 +475,16 @@ int main(int argc, char* argv[])
 
     /// RENDERIZAÇÃO DO PLANO DO CHÃO
 
-        model = Matrix_Translate(0.0f,-1.0f,0.0f) * Matrix_Scale(80.0f,2.0f,80.0f);
+        model = Matrix_Translate(0.0f,-1.0f,0.0f) * Matrix_Scale(180.0f,2.0f,180.0f);
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, PLANE);
         DrawVirtualObject("the_plane");
 
     /// RENDERIZAÇÃO DO MODELO DA ARMA
-        model = Matrix_Translate(1.3f,-1.0f,-2.5f)* Matrix_Scale(0.1f,0.1f,0.1f) *
-        Matrix_Rotate_Y(1.7f) *
+        model = Matrix_Translate(1.1f,-1.7f,-2.5f)* Matrix_Scale(0.15f,0.15f,0.15f) *
+        Matrix_Rotate_Y(1.4f) *
         Matrix_Rotate_X(-1.5f)*
-        Matrix_Rotate_Z(1.7f) ;
+        Matrix_Rotate_Z(1.8f) ;
         glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(g_object_id_uniform, GUN);
         DrawVirtualObject("11683_gun");
@@ -506,36 +497,17 @@ int main(int argc, char* argv[])
         // Guarda esta posicao (Matrix_Translate) em Alien_Models.
         while (Alien_In_Game < Alien_Spawn_Qtd){
 
-            int Spawn_Side = rand() % 4;
-            float Alien_spawn_desloc = rand()%100+1 - rand()%200+1;
-
-            switch(Spawn_Side){
-                case 0:
-                    model = Matrix_Translate( camera_position_general.x + Alien_Spawn_Min_Range, 2.0f, camera_position_general.z + Alien_spawn_desloc);
-                    break;
-
-                case 1:
-                    model = Matrix_Translate( camera_position_general.x+ Alien_spawn_desloc, 2.0f, camera_position_general.z + Alien_Spawn_Min_Range);
-                    break;
-
-                case 2:
-                    model = Matrix_Translate( -Alien_Spawn_Min_Range + camera_position_general.x, 2.0f, camera_position_general.z + Alien_spawn_desloc);
-                    break;
-
-                case 3:
-                    model = Matrix_Translate( Alien_spawn_desloc + camera_position_general.x, 2.0f, -Alien_Spawn_Min_Range + camera_position_general.z);
-                    break;
-
-                default:
-                    model = Matrix_Translate( 0.0f, 2.0f, 0.0f);
-                    break;
-                }
-
-            model *= Matrix_Scale(10.0f,10.0f,10.0f);
+            // Coordenadas Polares para o spawn dos aliens
+            float Alien_spawn_desloc = rand()%360+1;
+            float spawn_x = Alien_Spawn_Min_Range * cos(Alien_spawn_desloc) + camera_position_general.x;
+            float spawn_z = Alien_Spawn_Min_Range * sin(Alien_spawn_desloc) + camera_position_general.z;
 
             // Fazer um array/list para armazenar cada modelo de alien (começo do programa com 4 models)
             // Sempre que Alien_In_Game diminuir, gera uma nova posicao para um novo alien.
-            Alien_Model = model;
+            Alien_Models_X.push_back(spawn_x);
+                        //printf("%.2f\n",Alien_Models_X.back());
+            Alien_Models_Z.push_back(spawn_z);
+                        //printf("%.2f\n",Alien_Models_Z.back());
 
             Alien_In_Game++;
         }
@@ -543,12 +515,20 @@ int main(int argc, char* argv[])
         // Desenha os aliens atuais
         for (int d = 0; d < Alien_Spawn_Qtd; d++){
 
-            //                                        Acessar o Alien_Models[d] ----|
-            //                                                                      V
-            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(Alien_Model));
+            // Deslocamento em direcao ao Player
+            /// RESOLVER: ELES SE DESLOCAM "PARA FRENTE" DA CÂMERA. PARECE QUE ESTÃO COM UM OFFSET.
+            /// ALIENS PRECISAM SE DESLOCAR PARA ONDE ESTÁ A ARMA (?) OU PARA O PLANO NEAR (??)
+            float Alien_desloc_x = (camera_position_general.x) - (Alien_Models_X[d] / (float)glfwGetTime() );
+            float Alien_desloc_z = (camera_position_general.z) - (Alien_Models_Z[d] / (float)glfwGetTime() );
+
+            model = Matrix_Translate(Alien_desloc_x, 12.0f, Alien_desloc_z)*
+                    Matrix_Scale(10.0f,10.0f,10.0f);
+
+            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, ALIEN);
             DrawVirtualObject("object_0");
         }
+
 
 /*
         /// Desenhamos o HUD na tela
@@ -565,8 +545,12 @@ int main(int argc, char* argv[])
         glEnable(GL_DEPTH_TEST);
 */
 
-
         TextRendering_ShowFramesPerSecond(window);
+
+        glm::vec4 p_model;
+        float pad = TextRendering_LineHeight(window);
+
+        TextRendering_PrintMatrixVectorProduct(window, model, p_model, -1.0f, 1.0f-2*pad, 1.0f);
 
         // O framebuffer onde OpenGL executa as operações de renderização não
         // é o mesmo que está sendo mostrado para o usuário, caso contrário
@@ -1412,7 +1396,7 @@ void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
     // Atualizamos a distância da câmera para a origem utilizando a
     // movimentação da "rodinha", simulando um ZOOM.
 
-    g_CameraDistance -= 0.1f*yoffset;
+    //g_CameraDistance -= 0.1f*yoffset;
 
     // Uma câmera look-at nunca pode estar exatamente "em cima" do ponto para
     // onde ela está olhando, pois isto gera problemas de divisão por zero na
@@ -1420,9 +1404,9 @@ void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
     // nunca pode ser zero. Versões anteriores deste código possuíam este bug,
     // o qual foi detectado pelo aluno Vinicius Fraga (2017/2).
 
-    const float verysmallnumber = std::numeric_limits<float>::epsilon();
-    if (g_CameraDistance < verysmallnumber)
-        g_CameraDistance = verysmallnumber;
+    //const float verysmallnumber = std::numeric_limits<float>::epsilon();
+    //if (g_CameraDistance < verysmallnumber)
+    //    g_CameraDistance = verysmallnumber;
 }
 
 // Definição da função que será chamada sempre que o usuário pressionar alguma
@@ -1440,38 +1424,6 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
     // Se o usuário pressionar a tecla ESC, fechamos a janela.
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
-
-    // O código abaixo implementa a seguinte lógica:
-    //   Se apertar tecla X       então g_AngleX += delta;
-    //   Se apertar tecla shift+X então g_AngleX -= delta;
-    //   Se apertar tecla Y       então g_AngleY += delta;
-    //   Se apertar tecla shift+Y então g_AngleY -= delta;
-    //   Se apertar tecla Z       então g_AngleZ += delta;
-    //   Se apertar tecla shift+Z então g_AngleZ -= delta;
-
-    float delta = 3.141592 / 16; // 22.5 graus, em radianos.
-
-    if (key == GLFW_KEY_X && action == GLFW_PRESS)
-    {
-        g_AngleX += (mod & GLFW_MOD_SHIFT) ? -delta : delta;
-    }
-
-    if (key == GLFW_KEY_Y && action == GLFW_PRESS)
-    {
-        g_AngleY += (mod & GLFW_MOD_SHIFT) ? -delta : delta;
-    }
-    if (key == GLFW_KEY_Z && action == GLFW_PRESS)
-    {
-        g_AngleZ += (mod & GLFW_MOD_SHIFT) ? -delta : delta;
-    }
-
-    // Se o usuário apertar a tecla espaço, resetamos os ângulos de Euler para zero.
-    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
-    {
-        g_AngleX = 0.0f;
-        g_AngleY = 0.0f;
-        g_AngleZ = 0.0f;
-    }
 
     // Se o usuário apertar a tecla H, fazemos um "toggle" do texto informativo mostrado na tela.
     if (key == GLFW_KEY_H && action == GLFW_PRESS)
@@ -1517,6 +1469,21 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
             move_camera_D = true;
         else if (action == GLFW_RELEASE)
             move_camera_D = false;
+        else if (action == GLFW_REPEAT);
+    }
+
+    if (key == GLFW_KEY_SPACE){
+        if (action == GLFW_PRESS)
+            move_up = true;
+        else if (action == GLFW_RELEASE)
+            move_up = false;
+        else if (action == GLFW_REPEAT);
+    }
+    if (key == GLFW_KEY_C){
+        if (action == GLFW_PRESS)
+            move_down = true;
+        else if (action == GLFW_RELEASE)
+            move_down = false;
         else if (action == GLFW_REPEAT);
     }
     //----------------------------------------

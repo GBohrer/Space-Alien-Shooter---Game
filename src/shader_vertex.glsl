@@ -53,8 +53,9 @@ void main()
         viewg[3][0] = 0.0f; viewg[3][1] = 0.0f; viewg[3][2] = 0.0f; viewg[3][3] = 1.0f;
 
         gl_Position = projection * viewg * model * model_coefficients;
-    }
-    else{
+
+    } else {
+
         gl_Position = projection * view * model * model_coefficients;
     }
 

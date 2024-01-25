@@ -50,6 +50,19 @@
 #include "utils.h"
 #include "matrices.h"
 
+//#include "collisions.cpp" //incluindo colisões
+
+bool ColisaoPontoPlano(float yp, float yc){
+    float altura = 5;
+    bool colisao=0;
+
+    if(yp == altura+yc){
+        colisao=1;
+    }
+
+    return colisao;
+}
+
 // Estrutura que representa um modelo geométrico carregado a partir de um
 // arquivo ".obj". Veja https://en.wikipedia.org/wiki/Wavefront_.obj_file .
 struct ObjModel
@@ -423,10 +436,15 @@ int main(int argc, char* argv[])
 
         /// IMPLEMENTAR GRAVIDADE (CURVAS DE BEZIER ?)
         if(move_up) {
-            camera_position_general.y += camera_up_vector.y * Player_Speed_mod ;
+            camera_position_general.y += camera_up_vector.y*5.0f * Player_Speed_mod ;
         }
-        if(move_down) {
-            camera_position_general += -camera_up_vector * Player_Speed_mod ;
+        if(1) {
+                if(ColisaoPontoPlano(camera_position_general.y,-1.0f)){
+                    move_down=0;
+                }
+                else{
+                    camera_position_general += -camera_up_vector*0.5f * Player_Speed_mod ;
+                }
         }
 
         //-------------------------------------------------------------
@@ -441,7 +459,7 @@ int main(int argc, char* argv[])
         // Note que, no sistema de coordenadas da câmera, os planos near e far
         // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
         float nearplane = -0.1f;  // Posição do "near plane"
-        float farplane  = -10.0f*15; // Posição do "far plane"
+        float farplane  = -10.0f*20; // Posição do "far plane"
 
         // Projeção Perspectiva.
         // Para definição do field of view (FOV), veja slides 205-215 do documento Aula_09_Projecoes.pdf.

@@ -25,6 +25,7 @@ uniform sampler2D TextureImage3;
 
 #define GUN    3
 #define ALIEN  4
+#define AIM    5
 uniform int object_id;
 
 //uniform vec4 light_position; // sequiser ponto de luz
@@ -44,7 +45,7 @@ void main()
     // deste Vertex Shader, a placa de vídeo (GPU) fará a divisão por W. Veja
     // slides 41-67 e 69-86 do documento Aula_09_Projecoes.pdf.
 
-    if(object_id == GUN){
+    if(object_id == GUN || object_id == AIM){
         mat4 viewg;
 
         viewg[0][0] = 1.0f; viewg[0][1] = 0.0f; viewg[0][2] = 0.0f; viewg[0][3] = 0.0f;
@@ -53,10 +54,9 @@ void main()
         viewg[3][0] = 0.0f; viewg[3][1] = 0.0f; viewg[3][2] = 0.0f; viewg[3][3] = 1.0f;
 
         gl_Position = projection * viewg * model * model_coefficients;
-
     } else {
-
         gl_Position = projection * view * model * model_coefficients;
+
     }
 
     // Como as variáveis acima  (tipo vec4) são vetores com 4 coeficientes,

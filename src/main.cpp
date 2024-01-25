@@ -204,7 +204,6 @@ bool move_camera_S  = false;
 bool move_camera_D  = false;
 bool move_up        = false;
 bool move_down      = false;
-float cam_speed     = 0.3;
 glm::vec4 camera_position_general = glm::vec4(0.0f,8.0f,0.0f,1.0f);
 //---------------------------------------------------------------------
 
@@ -241,8 +240,8 @@ std::vector<float> Alien_Models_Z;
 
 // Atributos Player
 int Player_Kill_Count   = 0;
-float Player_Speed_mod  = 1.0f;
-
+float Player_Speed_mod  = 0.5f;
+bool Player_is_alive    = true;
 
 int main(int argc, char* argv[])
 {
@@ -370,6 +369,9 @@ int main(int argc, char* argv[])
     // Ficamos em um loop infinito, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
     {
+
+        while (Player_is_alive) {
+
         // Aqui executamos as operações de renderização
 
         // Definimos a cor do "fundo" do framebuffer como branco.
@@ -405,26 +407,26 @@ int main(int argc, char* argv[])
         // Controle da movimentação ------------------------------------------
 
         if(move_camera_W){
-            camera_position_general.x -= w.x * cam_speed;
-            camera_position_general.z -= w.z * cam_speed;
+            camera_position_general.x -= w.x * Player_Speed_mod;
+            camera_position_general.z -= w.z * Player_Speed_mod;
         }
         if(move_camera_A){
-            camera_position_general += u * cam_speed;
+            camera_position_general += u * Player_Speed_mod;
         }
         if(move_camera_S){
-            camera_position_general.x += w.x * cam_speed;
-            camera_position_general.z += w.z * cam_speed;
+            camera_position_general.x += w.x * Player_Speed_mod;
+            camera_position_general.z += w.z * Player_Speed_mod;
         }
         if(move_camera_D){
-            camera_position_general -= u * cam_speed;
+            camera_position_general -= u * Player_Speed_mod;
         }
 
         /// IMPLEMENTAR GRAVIDADE (CURVAS DE BEZIER ?)
         if(move_up) {
-            camera_position_general += camera_up_vector * cam_speed ;
+            camera_position_general.y += camera_up_vector.y * Player_Speed_mod ;
         }
         if(move_down) {
-            camera_position_general += -camera_up_vector * cam_speed ;
+            camera_position_general += -camera_up_vector * Player_Speed_mod ;
         }
 
         //-------------------------------------------------------------
@@ -440,7 +442,6 @@ int main(int argc, char* argv[])
         // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
         float nearplane = -0.1f;  // Posição do "near plane"
         float farplane  = -10.0f*15; // Posição do "far plane"
-
 
         // Projeção Perspectiva.
         // Para definição do field of view (FOV), veja slides 205-215 do documento Aula_09_Projecoes.pdf.
@@ -460,7 +461,7 @@ int main(int argc, char* argv[])
         #define PLANE  2
         #define GUN    3
         #define ALIEN  4
-
+        #define AIM    5
 
     /// RENDERIZAÇÃO DO MODELO DA ESFERA (SkyBox)
 
@@ -473,6 +474,7 @@ int main(int argc, char* argv[])
         glEnable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
 
+
     /// RENDERIZAÇÃO DO PLANO DO CHÃO
 
         model = Matrix_Translate(0.0f,-1.0f,0.0f) * Matrix_Scale(180.0f,2.0f,180.0f);
@@ -480,7 +482,9 @@ int main(int argc, char* argv[])
         glUniform1i(g_object_id_uniform, PLANE);
         DrawVirtualObject("the_plane");
 
+
     /// RENDERIZAÇÃO DO MODELO DA ARMA
+
         model = Matrix_Translate(1.1f,-1.7f,-2.5f)* Matrix_Scale(0.15f,0.15f,0.15f) *
         Matrix_Rotate_Y(1.4f) *
         Matrix_Rotate_X(-1.5f)*
@@ -489,9 +493,16 @@ int main(int argc, char* argv[])
         glUniform1i(g_object_id_uniform, GUN);
         DrawVirtualObject("11683_gun");
 
-    //Matrix_Rotate_Z(g_AngleX + (float)glfwGetTime() * 0.5f)
-
     /// RENDERIZAÇÃO ALIENS
+
+        // Teste de colisão
+/*
+        for (int d = 0; d < Alien_Spawn_Qtd; d++){
+            if(Alien_Models_X[d].equal(camera_position_general.x) || Alien_Models_Z.equal(camera_position_general.z) ){
+                exit();
+            }
+        }
+*/
 
         // Gera uma nova posicao inicial aleatoria se a quantidade de aliens no jogo for menor que o desejado.
         // Guarda esta posicao (Matrix_Translate) em Alien_Models.
@@ -515,11 +526,11 @@ int main(int argc, char* argv[])
         // Desenha os aliens atuais
         for (int d = 0; d < Alien_Spawn_Qtd; d++){
 
+            /// OBS.: TALVEZ IMPLEMENTAR CURVAS DE BEZIER AQUI - MOVIMENTAÇÃO AINDA ESTRANHA
+
             // Deslocamento em direcao ao Player
-            /// RESOLVER: ELES SE DESLOCAM "PARA FRENTE" DA CÂMERA. PARECE QUE ESTÃO COM UM OFFSET.
-            /// ALIENS PRECISAM SE DESLOCAR PARA ONDE ESTÁ A ARMA (?) OU PARA O PLANO NEAR (??)
-            float Alien_desloc_x = (camera_position_general.x) - (Alien_Models_X[d] / (float)glfwGetTime() );
-            float Alien_desloc_z = (camera_position_general.z) - (Alien_Models_Z[d] / (float)glfwGetTime() );
+            float Alien_desloc_x = camera_position_general.x + 14.0f - (((camera_position_general.x /Player_Speed_mod) - Alien_Models_X[d]) / (float)glfwGetTime() );
+            float Alien_desloc_z = camera_position_general.z + 5.0f  - (((camera_position_general.z /Player_Speed_mod) - Alien_Models_Z[d]) / (float)glfwGetTime() );
 
             model = Matrix_Translate(Alien_desloc_x, 12.0f, Alien_desloc_z)*
                     Matrix_Scale(10.0f,10.0f,10.0f);
@@ -530,8 +541,8 @@ int main(int argc, char* argv[])
         }
 
 
+    /// RENDERIZAÇÃO DO HUD (MIRA) NA TELA
 /*
-        /// Desenhamos o HUD na tela
         glDisable(GL_DEPTH_TEST);
 
         // Desenhar a mira
@@ -570,6 +581,8 @@ int main(int argc, char* argv[])
     // Finalizamos o uso dos recursos do sistema operacional
     glfwTerminate();
 
+
+    }
     // Fim do programa
     return 0;
 }
@@ -701,7 +714,6 @@ void LoadShadersFromFiles()
     g_object_id_uniform  = glGetUniformLocation(g_GpuProgramID, "object_id"); // Variável "object_id" em shader_fragment.glsl
     g_bbox_min_uniform   = glGetUniformLocation(g_GpuProgramID, "bbox_min");
     g_bbox_max_uniform   = glGetUniformLocation(g_GpuProgramID, "bbox_max");
-
     // Variáveis em "shader_fragment.glsl" para acesso das imagens de textura
     glUseProgram(g_GpuProgramID);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage0"), 0);

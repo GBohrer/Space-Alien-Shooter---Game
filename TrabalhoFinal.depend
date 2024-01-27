@@ -973,7 +973,7 @@
 	<inttypes.h>
 	<stdint.h>
 
-1706213198 source:c:\users\nycolle\desktop\trabalhofinal\src\main.cpp
+1706384670 source:c:\users\nycolle\desktop\trabalhofinal\src\main.cpp
 	<cmath>
 	<cstdio>
 	<cstdlib>
@@ -995,6 +995,7 @@
 	<stb_image.h>
 	"utils.h"
 	"matrices.h"
+	"collisions.h"
 
 1706139968 c:\users\nycolle\desktop\trabalhofinal\include\glfw\glfw3.h
 	<stddef.h>
@@ -3866,5 +3867,8 @@
 
 1706139968 c:\users\nycolle\desktop\trabalhofinal\include\glm\simd\integer.h
 
-1706210661 source:c:\users\nycolle\desktop\trabalhofinal\src\collisions.cpp
+1706380027 source:c:\users\nycolle\desktop\trabalhofinal\src\collisions.cpp
+	"collisions.h"
+
+1706380029 c:\users\nycolle\desktop\trabalhofinal\include\collisions.h
 

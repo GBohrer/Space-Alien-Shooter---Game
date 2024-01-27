@@ -1,10 +1,13 @@
 
+#include "collisions.h"
 
-//int ColisaoPontoPlano(float yp, float yc){
-//    float distance = (yc+0.5) - yp;
-//
-//    if(distance>0)
-//        return 0;
-//    else
-//        return 1;
-//}
+bool ColisaoPontoPlano(float yp, float yc){
+    float altura = 5;
+    bool colisao=0;
+
+    if(yp == altura+yc){
+        colisao=1;
+    }
+
+    return colisao;
+}

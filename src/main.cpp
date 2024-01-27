@@ -50,18 +50,9 @@
 #include "utils.h"
 #include "matrices.h"
 
-//#include "collisions.cpp" //incluindo colisões
+#include "collisions.h" //incluindo colisões
 
-bool ColisaoPontoPlano(float yp, float yc){
-    float altura = 5;
-    bool colisao=0;
 
-    if(yp == altura+yc){
-        colisao=1;
-    }
-
-    return colisao;
-}
 
 // Estrutura que representa um modelo geométrico carregado a partir de um
 // arquivo ".obj". Veja https://en.wikipedia.org/wiki/Wavefront_.obj_file .
@@ -220,6 +211,11 @@ bool move_down      = false;
 glm::vec4 camera_position_general = glm::vec4(0.0f,8.0f,0.0f,1.0f);
 //---------------------------------------------------------------------
 
+
+//Area de variaveis Disparo
+bool click = false; //tecla de tiro
+//------------------------
+
 // Variável que controla o tipo de projeção utilizada: perspectiva ou ortográfica.
 bool g_UsePerspectiveProjection = true;
 
@@ -362,6 +358,10 @@ int main(int argc, char* argv[])
     ComputeNormals(&alienmodel);
     BuildTrianglesAndAddToVirtualScene(&alienmodel);
 
+    ObjModel bulletmodel("../../data/bullet.obj");
+    ComputeNormals(&bulletmodel);
+    BuildTrianglesAndAddToVirtualScene(&bulletmodel);
+
     if ( argc > 1 )
     {
         ObjModel model(argv[1]);
@@ -480,6 +480,7 @@ int main(int argc, char* argv[])
         #define GUN    3
         #define ALIEN  4
         #define AIM    5
+        #define BULLET 6
 
     /// RENDERIZAÇÃO DO MODELO DA ESFERA (SkyBox)
 
@@ -573,6 +574,16 @@ int main(int argc, char* argv[])
 
         glEnable(GL_DEPTH_TEST);
 */
+
+        if (click){                           //Caso exista disparo
+            /// RENDERIZAÇÃO DO MODELO DA BALA                         Usar? (float)glfwGetTime()
+
+            model = Matrix_Translate(1.0f+ (float)glfwGetTime() * 10.0f ,1.0f, 1.0f)
+            * Matrix_Scale(1.1f,1.1f,1.1f);
+            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, BULLET);
+            DrawVirtualObject("mesh01");
+        }
 
         TextRendering_ShowFramesPerSecond(window);
 
@@ -1393,6 +1404,10 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
         // cursor como sendo a última posição conhecida do cursor.
         g_LastCursorPosX = xpos;
         g_LastCursorPosY = ypos;
+
+        //Disparo----------------------
+        click=true;
+        //-----------------------------
     }
 
     if (g_RightMouseButtonPressed)

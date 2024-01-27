@@ -25,6 +25,7 @@ uniform mat4 projection;
 #define PLANE  2
 #define GUN    3
 #define ALIEN  4
+#define BULLET 6
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -158,6 +159,9 @@ void main()
     }
     else if(object_id == PLANE ){
         color.rgb = Kd2;
+    }
+    else if(object_id == BULLET){
+        color.rgb = vec3(0.0f, 0.0f, 1.0f);
     }
     else if(object_id == GUN){
         color.rgb = cor_v.rgb;

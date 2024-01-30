@@ -19,15 +19,15 @@ bool ColisaoEsferaEsfera(struct sphere_t* sphere1, struct sphere_t* sphere2) {
     return distance_squared <= r_sum * r_sum;
 }
 
-bool ColisaoCuboEsfera(struct  cubo_t* cubo, struct sphere_t* sphere) {
+bool ColisaoCuboEsfera(struct cubo_t cubo, struct sphere_t* sphere) {
 
-    float deltaX = std::abs(cubo->position.x - cubo->position.x);
-    float deltaY = std::abs(cubo->position.y - sphere->position.y);
-    float deltaZ = std::abs(cubo->position.z - sphere->position.z);
+    float deltaX = std::abs(cubo.position.x - sphere->position.x);
+    float deltaY = std::abs(cubo.position.y - sphere->position.y);
+    float deltaZ = std::abs(cubo.position.z - sphere->position.z);
 
-    float projectionX = deltaX - cubo->width / 2.0f;
-    float projectionY = deltaY - cubo->height / 2.0f;
-    float projectionZ = deltaZ - cubo->depth / 2.0f;
+    float projectionX = deltaX - cubo.width / 2.0f;
+    float projectionY = deltaY - cubo.height / 2.0f;
+    float projectionZ = deltaZ - cubo.depth / 2.0f;
 
     // Verificar se a esfera está dentro do cubo em cada eixo
     if (projectionX < 0)

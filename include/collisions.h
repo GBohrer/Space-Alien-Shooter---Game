@@ -10,7 +10,7 @@ struct sphere_t{
     int radius;
 
 };
-
+// Struct para hitbox cúbica
 struct cubo_t{
 
     glm::vec3 position;
@@ -22,4 +22,4 @@ struct cubo_t{
 
 bool ColisaoPontoPlano(float yp, float yc);
 bool ColisaoEsferaEsfera(struct sphere_t *sphere1, struct sphere_t *sphere2);
-bool ColisaoCuboEsfera(struct  cubo_t* cubo, struct sphere_t* esfera);
+bool ColisaoCuboEsfera(struct cubo_t cubo, struct sphere_t* esfera);

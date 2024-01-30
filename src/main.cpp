@@ -241,7 +241,7 @@ GLuint g_NumLoadedTextures = 0;
 int Player_Kill_Count   = 0;
 float Player_Speed_mod  = 0.5f;
 bool Player_is_alive    = true;
-std::vector<cubo_t> Player_Hitbox;
+struct cubo_t Player_Hitbox;
 
 // Atributos Alien
 int Alien_In_Game           = 0;
@@ -679,6 +679,17 @@ int main(int argc, char* argv[])
 
        /// TESTES DE COLISÃO
 
+            //atualizando hitbox player
+
+            Player_Hitbox.depth=2.0f;
+            Player_Hitbox.height=2.0f;
+            Player_Hitbox.width=2.0f;
+            Player_Hitbox.position.x = camera_position_general.x;
+            Player_Hitbox.position.y = camera_position_general.y;
+            Player_Hitbox.position.z = camera_position_general.z;
+
+            //-----------------------
+
             // Teste do player com o chao
             if(!ColisaoPontoPlano(camera_position_general.y,-1.0f))
                 camera_position_general += -camera_up_vector * 0.5f;
@@ -688,9 +699,11 @@ int main(int argc, char* argv[])
 
                // Se houver colisao entre algum alien e o player
 
-     //           if (ColisaoEsferaCubo(&Alien_Hitboxex[alien], &Player_Hitbox){
-     //                  exit();
-     //           }
+                if (ColisaoCuboEsfera(Player_Hitbox, &Alien_Hitboxes[alien])){
+
+                       printf("colisao");
+                       //exit();
+                }
 
                 for (int bullet = 0; bullet < Bullet_In_Game; bullet++ ){
 

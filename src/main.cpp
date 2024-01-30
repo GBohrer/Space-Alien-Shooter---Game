@@ -5,7 +5,7 @@
 //    INF01047 Fundamentos de Computação Gráfica
 //               Prof. Eduardo Gastal
 //
-//                   TRABALHO FINAL - 2023/02
+//              TRABALHO FINAL - 2023/02
 //
 //      00318222 - GABRIEL ALVES BOHRER
 //      00335240 - JEFFERSON RUAN BARCELOS GODINHO
@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <time.h>
 
 // Headers abaixo são específicos de C++
 #include <map>
@@ -51,8 +52,6 @@
 #include "matrices.h"
 
 #include "collisions.h" //incluindo colisões
-
-
 
 // Estrutura que representa um modelo geométrico carregado a partir de um
 // arquivo ".obj". Veja https://en.wikipedia.org/wiki/Wavefront_.obj_file .
@@ -130,7 +129,9 @@ void LoadShader(const char* filename, GLuint shader_id); // Função utilizada p
 GLuint CreateGpuProgram(GLuint vertex_shader_id, GLuint fragment_shader_id); // Cria um programa de GPU
 void PrintObjModelInfo(ObjModel*); // Função para debugging
 
-GLuint BuildTrianglesForAim(float desloc_x);      // Constroi triangulos para renderizacao da mira na tela
+std::tuple<std::vector<double>, std::vector<double>, std::vector<double>> BezierCurves(std::vector<double> xX, std::vector<double> yY, std::vector<double> zZ);
+glm::mat4 RodriguesMatrix (glm::vec3 vv, float c, float s);
+
 
 // Declaração de funções auxiliares para renderizar texto dentro da janela
 // OpenGL. Estas funções estão definidas no arquivo "textrendering.cpp".
@@ -236,21 +237,42 @@ GLuint g_NumLoadedTextures = 0;
 
 /// VARIÁVEIS GAMEPLAY
 
-// Atributos Alien
-int Alien_In_Game           = 0;
-int Alien_Spawn_Qtd         = 4;
-float Alien_Speed_mod       = 1.0f;
-int Alien_Health            = 100;
-float Alien_Spawn_Min_Range = 100.0f;
-
-// Lista com os 4 modelos (Matrix_Translate) dos aliens atuais no jogo
-std::vector<float> Alien_Models_X;
-std::vector<float> Alien_Models_Z;
-
 // Atributos Player
 int Player_Kill_Count   = 0;
 float Player_Speed_mod  = 0.5f;
 bool Player_is_alive    = true;
+std::vector<cubo_t> Player_Hitbox;
+
+// Atributos Alien
+int Alien_In_Game           = 0;
+int Alien_Spawn_Qtd         = 4;
+int Alien_Health            = 100;
+float Alien_speed_mod       = 0.2f;
+float Alien_Spawn_Min_Range = 250.0f;
+
+// Lista com os 4 modelos (Matrix_Translate) dos aliens atuais no jogo
+std::vector<float> Alien_Models_X;
+std::vector<float> Alien_Models_Z;
+std::vector<sphere_t> Alien_Hitboxes;
+
+// Atributos bullet
+int Bullet_In_Game  = 0;
+int Bullet_Qtd      = 2;
+std::vector<float> Bullet_Models_X;
+std::vector<float> Bullet_Models_Y;
+std::vector<float> Bullet_Models_Z;
+std::vector<float> Bullet_view_vector_X;
+std::vector<float> Bullet_view_vector_Y;
+std::vector<float> Bullet_view_vector_Z;
+std::vector<sphere_t> Bullet_Hitboxes;
+
+// Variáveis de tempo para animação
+float animation_t_prev = (float)glfwGetTime();
+float animation_t_now = 0;
+float delta_t = 0;
+
+bool In_Menu = true;
+
 
 int main(int argc, char* argv[])
 {
@@ -320,12 +342,8 @@ int main(int argc, char* argv[])
 
     printf("GPU: %s, %s, OpenGL %s, GLSL %s\n", vendor, renderer, glversion, glslversion);
 
-    // Contrucao da mira
-    GLuint vertex_array_object_aim = BuildTrianglesForAim(0);
-
     // Carregamos os shaders de vértices e de fragmentos que serão utilizados
     // para renderização. Veja slides 180-200 do documento Aula_03_Rendering_Pipeline_Grafico.pdf.
-    //
     LoadShadersFromFiles();
 
 
@@ -341,11 +359,7 @@ int main(int argc, char* argv[])
     ObjModel spheremodel("../../data/sphere.obj");
     ComputeNormals(&spheremodel);
     BuildTrianglesAndAddToVirtualScene(&spheremodel);
-/*
-    ObjModel bunnymodel("../../data/bunny.obj");
-    ComputeNormals(&bunnymodel);
-    BuildTrianglesAndAddToVirtualScene(&bunnymodel);
-*/
+
     ObjModel planemodel("../../data/plane.obj");
     ComputeNormals(&planemodel);
     BuildTrianglesAndAddToVirtualScene(&planemodel);
@@ -358,9 +372,17 @@ int main(int argc, char* argv[])
     ComputeNormals(&alienmodel);
     BuildTrianglesAndAddToVirtualScene(&alienmodel);
 
+    ObjModel aimmodel("../../data/aim2.obj");
+    ComputeNormals(&aimmodel);
+    BuildTrianglesAndAddToVirtualScene(&aimmodel);
+
     ObjModel bulletmodel("../../data/bullet.obj");
     ComputeNormals(&bulletmodel);
     BuildTrianglesAndAddToVirtualScene(&bulletmodel);
+
+    //ObjModel titlemodel("../../data/title.obj");
+   // ComputeNormals(&titlemodel);
+    //BuildTrianglesAndAddToVirtualScene(&titlemodel);
 
     if ( argc > 1 )
     {
@@ -383,235 +405,340 @@ int main(int argc, char* argv[])
     while (!glfwWindowShouldClose(window))
     {
 
-        while (Player_is_alive) {
+            // Definimos a cor do "fundo" do framebuffer como branco.
+            glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
-        // Aqui executamos as operações de renderização
+            // "Pintamos" todos os pixels do framebuffer com a cor definida acima,
+            // e também resetamos todos os pixels do Z-buffer (depth buffer).
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Definimos a cor do "fundo" do framebuffer como branco.
-        //           R     G     B     A
-        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+            // Pedimos para a GPU utilizar o programa de GPU criado acima (contendo
+            // os shaders de vértice e fragmentos).
+            glUseProgram(g_GpuProgramID);
 
-        // "Pintamos" todos os pixels do framebuffer com a cor definida acima,
-        // e também resetamos todos os pixels do Z-buffer (depth buffer).
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            float r;
 
-        // Pedimos para a GPU utilizar o programa de GPU criado acima (contendo
-        // os shaders de vértice e fragmentos).
-        glUseProgram(g_GpuProgramID);
-
-        // Computamos a posição da câmera utilizando coordenadas esféricas.  As
-        // variáveis g_CameraDistance, g_CameraPhi, e g_CameraTheta são
-        // controladas pelo mouse do usuário. Veja as funções CursorPosCallback()
-        // e ScrollCallback().
-        float r = g_CameraDistance;
-        float y = r*sin(g_CameraPhi);
-        float z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
-        float x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
-
-        // Abaixo definimos as varáveis que efetivamente definem a câmera virtual.
-        // Veja slides 195-227 e 229-234 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
-        glm::vec4 camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
-        glm::vec4 camera_lookat_l    = glm::vec4(0.0f,0.0f,0.0f,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
-        glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
-        glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
-        glm::vec4 w = -camera_view_vector/(norm(camera_view_vector));
-        glm::vec4 u = crossproduct(camera_up_vector, camera_view_vector)/(norm(crossproduct(camera_up_vector, camera_view_vector)));
-
-        // Controle da movimentação ------------------------------------------
-
-        if(move_camera_W){
-            camera_position_general.x -= w.x * Player_Speed_mod;
-            camera_position_general.z -= w.z * Player_Speed_mod;
-        }
-        if(move_camera_A){
-            camera_position_general += u * Player_Speed_mod;
-        }
-        if(move_camera_S){
-            camera_position_general.x += w.x * Player_Speed_mod;
-            camera_position_general.z += w.z * Player_Speed_mod;
-        }
-        if(move_camera_D){
-            camera_position_general -= u * Player_Speed_mod;
-        }
-
-        /// IMPLEMENTAR GRAVIDADE (CURVAS DE BEZIER ?)
-        if(move_up) {
-            camera_position_general.y += camera_up_vector.y*5.0f * Player_Speed_mod ;
-        }
-        if(1) {
-                if(ColisaoPontoPlano(camera_position_general.y,-1.0f)){
-                    move_down=0;
-                }
-                else{
-                    camera_position_general += -camera_up_vector*0.5f * Player_Speed_mod ;
-                }
-        }
-
-        //-------------------------------------------------------------
-
-        // Computamos a matriz "View" utilizando os parâmetros da câmera para
-        // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
-        glm::mat4 view = Matrix_Camera_View(camera_position_general, camera_view_vector, camera_up_vector); //  CHAMADA TIPO FREECAM
-
-        // Agora computamos a matriz de Projeção.
-        glm::mat4 projection;
-
-        // Note que, no sistema de coordenadas da câmera, os planos near e far
-        // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
-        float nearplane = -0.1f;  // Posição do "near plane"
-        float farplane  = -10.0f*20; // Posição do "far plane"
-
-        // Projeção Perspectiva.
-        // Para definição do field of view (FOV), veja slides 205-215 do documento Aula_09_Projecoes.pdf.
-        float field_of_view = 3.141592 / 3.0f;
-        projection = Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
-
-        glm::mat4 model = Matrix_Identity(); // Transformação identidade de modelagem
-
-        // Enviamos as matrizes "view" e "projection" para a placa de vídeo
-        // (GPU). Veja o arquivo "shader_vertex.glsl", onde estas são
-        // efetivamente aplicadas em todos os pontos.
-        glUniformMatrix4fv(g_view_uniform       , 1 , GL_FALSE , glm::value_ptr(view));
-        glUniformMatrix4fv(g_projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
-
-        #define SPHERE 0
-        #define BUNNY  1
-        #define PLANE  2
-        #define GUN    3
-        #define ALIEN  4
-        #define AIM    5
-        #define BULLET 6
-
-    /// RENDERIZAÇÃO DO MODELO DA ESFERA (SkyBox)
-
-        model = Matrix_Translate(camera_position_general.x,camera_position_general.y,camera_position_general.z);
-        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, SPHERE);
-        glDisable(GL_CULL_FACE);  //ajustando normais
-        glDisable(GL_DEPTH_TEST); //desabilitando z buffer
-        DrawVirtualObject("the_sphere");
-        glEnable(GL_CULL_FACE);
-        glEnable(GL_DEPTH_TEST);
-
-
-    /// RENDERIZAÇÃO DO PLANO DO CHÃO
-
-        model = Matrix_Translate(0.0f,-1.0f,0.0f) * Matrix_Scale(180.0f,2.0f,180.0f);
-        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, PLANE);
-        DrawVirtualObject("the_plane");
-
-
-    /// RENDERIZAÇÃO DO MODELO DA ARMA
-
-        model = Matrix_Translate(1.1f,-1.7f,-2.5f)* Matrix_Scale(0.15f,0.15f,0.15f) *
-        Matrix_Rotate_Y(1.4f) *
-        Matrix_Rotate_X(-1.5f)*
-        Matrix_Rotate_Z(1.8f) ;
-        glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-        glUniform1i(g_object_id_uniform, GUN);
-        DrawVirtualObject("11683_gun");
-
-    /// RENDERIZAÇÃO ALIENS
-
-        // Teste de colisão
-/*
-        for (int d = 0; d < Alien_Spawn_Qtd; d++){
-            if(Alien_Models_X[d].equal(camera_position_general.x) || Alien_Models_Z.equal(camera_position_general.z) ){
-                exit();
+            if (In_Menu){
+                r = 100.0f;
+            } else {
+                r = g_CameraDistance;
             }
-        }
-*/
 
-        // Gera uma nova posicao inicial aleatoria se a quantidade de aliens no jogo for menor que o desejado.
-        // Guarda esta posicao (Matrix_Translate) em Alien_Models.
-        while (Alien_In_Game < Alien_Spawn_Qtd){
+            // Computamos a posição da câmera utilizando coordenadas esféricas.  As
+            // variáveis g_CameraDistance, g_CameraPhi, e g_CameraTheta são
+            // controladas pelo mouse do usuário. Veja as funções CursorPosCallback()
+            // e ScrollCallback().
+            float y = r*sin(g_CameraPhi);
+            float z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
+            float x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
 
-            // Coordenadas Polares para o spawn dos aliens
-            float Alien_spawn_desloc = rand()%360+1;
-            float spawn_x = Alien_Spawn_Min_Range * cos(Alien_spawn_desloc) + camera_position_general.x;
-            float spawn_z = Alien_Spawn_Min_Range * sin(Alien_spawn_desloc) + camera_position_general.z;
+            // Abaixo definimos as varáveis que efetivamente definem a câmera virtual.
+            // Veja slides 195-227 e 229-234 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
+            glm::vec4 camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
+            glm::vec4 camera_menu        = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera LOOK-AT
+            glm::vec4 camera_lookat_l    = glm::vec4(0.0f,0.0f,0.0f,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
+            glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
+            glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
+            glm::vec4 w = -camera_view_vector/(norm(camera_view_vector));
+            glm::vec4 u = crossproduct(camera_up_vector, camera_view_vector)/(norm(crossproduct(camera_up_vector, camera_view_vector)));
 
-            // Fazer um array/list para armazenar cada modelo de alien (começo do programa com 4 models)
-            // Sempre que Alien_In_Game diminuir, gera uma nova posicao para um novo alien.
-            Alien_Models_X.push_back(spawn_x);
-                        //printf("%.2f\n",Alien_Models_X.back());
-            Alien_Models_Z.push_back(spawn_z);
-                        //printf("%.2f\n",Alien_Models_Z.back());
+            // Computamos a matriz "View" utilizando os parâmetros da câmera para
+            // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
+            glm::mat4 view;
 
-            Alien_In_Game++;
-        }
+            if (In_Menu){
+                view = Matrix_Camera_View(camera_menu, camera_view_vector, camera_up_vector); //  CHAMADA TIPO LOOK-AT
 
-        // Desenha os aliens atuais
-        for (int d = 0; d < Alien_Spawn_Qtd; d++){
+            } else {
+                view = Matrix_Camera_View(camera_position_general, camera_view_vector, camera_up_vector); //  CHAMADA TIPO FREECAM
+            }
 
-            /// OBS.: TALVEZ IMPLEMENTAR CURVAS DE BEZIER AQUI - MOVIMENTAÇÃO AINDA ESTRANHA
+            // Agora computamos a matriz de Projeção.
+            glm::mat4 projection;
 
-            // Deslocamento em direcao ao Player
-            float Alien_desloc_x = camera_position_general.x + 14.0f - (((camera_position_general.x /Player_Speed_mod) - Alien_Models_X[d]) / (float)glfwGetTime() );
-            float Alien_desloc_z = camera_position_general.z + 5.0f  - (((camera_position_general.z /Player_Speed_mod) - Alien_Models_Z[d]) / (float)glfwGetTime() );
+            // Note que, no sistema de coordenadas da câmera, os planos near e far
+            // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
+            float nearplane = -0.1f;  // Posição do "near plane"
+            float farplane  = -10.0f*40; // Posição do "far plane"
 
-            model = Matrix_Translate(Alien_desloc_x, 12.0f, Alien_desloc_z)*
-                    Matrix_Scale(10.0f,10.0f,10.0f);
+            // Projeção Perspectiva.
+            // Para definição do field of view (FOV), veja slides 205-215 do documento Aula_09_Projecoes.pdf.
+            float field_of_view = 3.141592 / 3.0f;
+            projection = Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
+
+            glm::mat4 model = Matrix_Identity(); // Transformação identidade de modelagem
+
+            // Enviamos as matrizes "view" e "projection" para a placa de vídeo
+            // (GPU). Veja o arquivo "shader_vertex.glsl", onde estas são
+            // efetivamente aplicadas em todos os pontos.
+            glUniformMatrix4fv(g_view_uniform       , 1 , GL_FALSE , glm::value_ptr(view));
+            glUniformMatrix4fv(g_projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
+
+            #define SPHERE 0
+            #define BUNNY  1
+            #define PLANE  2
+            #define GUN    3
+            #define ALIEN  4
+            #define AIM    5
+            #define BULLET 6
+            #define TITLE  7
+
+        /// RENDERIZAÇÃO DO MODELO DA ESFERA (SkyBox)
+
+            if (In_Menu){
+                model = Matrix_Translate(camera_menu.x,camera_menu.y,camera_menu.z);
+            } else {
+                model = Matrix_Translate(camera_position_general.x,camera_position_general.y,camera_position_general.z);
+            }
+            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, SPHERE);
+            glDisable(GL_CULL_FACE);  //ajustando normais
+            glDisable(GL_DEPTH_TEST); //desabilitando z buffer
+            DrawVirtualObject("the_sphere");
+            glEnable(GL_CULL_FACE);
+            glEnable(GL_DEPTH_TEST);
+
+
+        /// RENDERIZAÇÃO DO PLANO DO CHÃO
+
+            model = Matrix_Translate(0.0f,-1.0f,0.0f) * Matrix_Scale(180.0f,2.0f,180.0f);
+            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, PLANE);
+            DrawVirtualObject("the_plane");
+
+        if(In_Menu){
+
+            /// RENDERIZAÇÃO DO TITULO
+
+            //model = Matrix_Translate(0.0f,12.0f,0.0f) * Matrix_Scale(20.0f, 20.0f, 20.0f) * Matrix_Rotate_X(1.54f);
+            //glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            //glUniform1i(g_object_id_uniform, TITLE);
+            //DrawVirtualObject("title");
+
+            TextRendering_PrintString(window, "Pressione ENTER", 0.0f, 0.0f, 1.5f);
+        } else {
+
+        /// RENDERIZAÇÃO DO MODELO DA ARMA
+
+            model = Matrix_Translate(1.1f,-1.7f,-2.5f)* Matrix_Scale(0.15f,0.15f,0.15f) *
+            Matrix_Rotate_Y(1.4f) *
+            Matrix_Rotate_X(-1.5f)*
+            Matrix_Rotate_Z(1.8f) ;
+            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, GUN);
+            DrawVirtualObject("11683_gun");
+
+            // Calculo do tempo de animacao
+            animation_t_now = (float)glfwGetTime();
+            delta_t = animation_t_now - animation_t_prev;
+            animation_t_prev = animation_t_now;
+
+        /// RENDERIZAÇÃO ALIENS
+
+            // Gera uma nova posicao inicial aleatoria se a quantidade de aliens no jogo for menor que o desejado.
+            // Guarda esta posicao (Matrix_Translate) em Alien_Models.
+            while (Alien_In_Game < Alien_Spawn_Qtd){
+
+                // Coordenadas Polares para o spawn dos aliens
+                float Alien_spawn_desloc = rand()%360+1;
+                float spawn_x = camera_position_general.x + Alien_Spawn_Min_Range * cos(Alien_spawn_desloc);
+                float spawn_z = camera_position_general.z + Alien_Spawn_Min_Range * sin(Alien_spawn_desloc);
+
+                // Fazer um array/list para armazenar cada modelo de alien (começo do programa com 4 models)
+                // Sempre que Alien_In_Game diminuir, gera uma nova posicao para um novo alien.
+                Alien_Models_X.push_back(spawn_x);
+                Alien_Models_Z.push_back(spawn_z);
+
+                Alien_In_Game++;
+            }
+
+            // Desenha os aliens "instanciados"
+            for (int d = 0; d < Alien_Spawn_Qtd; d++){
+
+                // Calcular o vetor v de rotacao e o angulo theta para passar na matriz de rotação de rodrigues
+
+                model = Matrix_Translate(Alien_Models_X[d] + 14.5f, 13.0f, Alien_Models_Z[d] + 8.0f)*
+                Matrix_Scale(10.0f,10.0f,10.0f);
+ //    -------> RodriguesMatrix();
+
+                glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                glUniform1i(g_object_id_uniform, ALIEN);
+                DrawVirtualObject("alien");
+
+                // Hitbox esféricas dos aliens
+                sphere_t s;
+                s.position = glm::vec3 (Alien_Models_X[d], 10.0f, Alien_Models_Z[d]);
+                s.radius = 5;
+                Alien_Hitboxes.push_back(s);
+
+                model = Matrix_Translate(Alien_Models_X[d], 10.0f, Alien_Models_Z[d]) * Matrix_Scale(5.0f, 5.0f, 5.0f);
+                glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                glUniform1i(g_object_id_uniform, SPHERE);
+                DrawVirtualObject("the_sphere");
+
+                // Deslocamento em direcao ao Player
+                Alien_Models_X[d] += (camera_position_general.x - Alien_Models_X[d]) * Alien_speed_mod * delta_t;
+                Alien_Models_Z[d] += (camera_position_general.z - Alien_Models_Z[d]) * Alien_speed_mod * delta_t;
+
+            }
+
+        /// RENDERIZAÇÃO DO MODELO DA BALA
+
+            //Caso exista disparo, gera uma nova bullet
+            if (click){
+
+                // Confere se a bullet já saiu do cenário
+                // Caso sim, deleta sua posicao
+                for (int b = 0; b < Bullet_In_Game; b++){
+                    if (abs(Bullet_Models_X[b] - camera_position_general.x) > 100.0f ||
+                        abs(Bullet_Models_Y[b] - camera_position_general.y) > 100.0f ||
+                        abs(Bullet_Models_Z[b] - camera_position_general.z) > 100.0f   ){
+
+                        Bullet_Models_X.erase(Bullet_Models_X.begin() + b);
+                        Bullet_Models_Y.erase(Bullet_Models_Y.begin() + b);
+                        Bullet_Models_Z.erase(Bullet_Models_Z.begin() + b);
+                        Bullet_view_vector_X.erase(Bullet_view_vector_X.begin() + b);
+                        Bullet_view_vector_Y.erase(Bullet_view_vector_Y.begin() + b);
+                        Bullet_view_vector_Z.erase(Bullet_view_vector_Z.begin() + b);
+                        Bullet_Hitboxes.erase(Bullet_Hitboxes.begin() + b);
+
+                        Bullet_In_Game--;
+                    }
+                }
+
+                // Gera uma nova posicao inicial de bullet se a quantidade de bullets no jogo for menor que o desejado
+                // Guarda esta posicao (Matrix_Translate) em Bullet_Models
+                while (Bullet_In_Game < Bullet_Qtd){
+
+                    Bullet_Models_X.push_back(camera_position_general.x + 1.1f);
+                    Bullet_Models_Y.push_back(camera_position_general.y - 1.7f);
+                    Bullet_Models_Z.push_back(camera_position_general.z - 2.5f);
+                    Bullet_view_vector_X.push_back(camera_view_vector.x);
+                    Bullet_view_vector_Y.push_back(camera_view_vector.y);
+                    Bullet_view_vector_Z.push_back(camera_view_vector.z);
+
+                    Bullet_In_Game++;
+                }
+            }
+
+            //Desenha todas as balas "instanciadas"
+            for (int b = 0; b < Bullet_In_Game; b++){
+
+                model = Matrix_Translate(Bullet_Models_X[b] ,Bullet_Models_Y[b], Bullet_Models_Z[b])
+                * Matrix_Scale(0.3f,0.3f,0.3f);
+
+                // Deslocamento da bala
+                Bullet_Models_X[b] += ( Bullet_view_vector_X[b]) * delta_t * 40;
+                Bullet_Models_Y[b] += ( Bullet_view_vector_Y[b]) * delta_t * 40;
+                Bullet_Models_Z[b] += ( Bullet_view_vector_Z[b]) * delta_t * 40;
+
+                glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                glUniform1i(g_object_id_uniform, BULLET);
+                DrawVirtualObject("mesh01");
+
+                // Hitbox esféricas das bullets
+                sphere_t s;
+                s.position = glm::vec3 (Bullet_Models_X[b], Bullet_Models_Y[b], Bullet_Models_Z[b]);
+                s.radius = 1;
+                Bullet_Hitboxes.push_back(s);
+
+             //   model = Matrix_Translate(s.position.x, s.position.y, s.position.z) * Matrix_Scale(1.0f, 1.0f, 1.0f);
+             //   glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+             //   glUniform1i(g_object_id_uniform, SPHERE);
+             //   DrawVirtualObject("the_sphere");
+            }
+
+        /// RENDERIZAÇÃO DO HUD (MIRA) NA TELA
+
+            model = Matrix_Scale(0.06f, 0.06f, 0.06f) * Matrix_Rotate_X(1.57f);
 
             glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-            glUniform1i(g_object_id_uniform, ALIEN);
-            DrawVirtualObject("object_0");
+            glUniform1i(g_object_id_uniform, AIM);
+            DrawVirtualObject("aim2");
+
+
+        /// MOVIMENTAÇÃO PLAYER
+
+            if(move_camera_W){
+                camera_position_general.x -= w.x * Player_Speed_mod;
+                camera_position_general.z -= w.z * Player_Speed_mod;
+            }
+            if(move_camera_A)
+                camera_position_general += u * Player_Speed_mod;
+
+            if(move_camera_S){
+                camera_position_general.x += w.x * Player_Speed_mod;
+                camera_position_general.z += w.z * Player_Speed_mod;
+            }
+            if(move_camera_D)
+                camera_position_general -= u * Player_Speed_mod;
+
+            if(move_up)
+                camera_position_general.y += camera_up_vector.y * 2.0f;
+
+
+       /// TESTES DE COLISÃO
+
+            // Teste do player com o chao
+            if(!ColisaoPontoPlano(camera_position_general.y,-1.0f))
+                camera_position_general += -camera_up_vector * 0.5f;
+
+
+            for (int alien = 0; alien < Alien_In_Game; alien++ ){
+
+               // Se houver colisao entre algum alien e o player
+
+     //           if (ColisaoEsferaCubo(&Alien_Hitboxex[alien], &Player_Hitbox){
+     //                  exit();
+     //           }
+
+                for (int bullet = 0; bullet < Bullet_In_Game; bullet++ ){
+
+                    // Se houver colisão entre algum alien e alguma bullet
+
+                    /// ATENÇÃO! COLISÃO COM BUG. ANALISAR E DESCOBRIR O ERRO
+
+                    if (ColisaoEsferaEsfera(&Alien_Hitboxes[alien], &Bullet_Hitboxes[bullet]) ){
+                        printf("BATEU");
+
+                        Alien_Models_X.erase(Alien_Models_X.begin() + alien);
+                        Alien_Models_Z.erase(Alien_Models_Z.begin() + alien);
+                        Alien_Hitboxes.erase(Alien_Hitboxes.begin() + alien);
+
+                        Player_Kill_Count++;
+                    }
+                }
+            }
+
+
+            // Imprime na tela informações
+            TextRendering_ShowFramesPerSecond(window);
+
+            glm::vec4 p_model;
+            float pad = TextRendering_LineHeight(window);
+            TextRendering_PrintMatrixVectorProduct(window, model, p_model, -1.0f, 1.0f-2*pad, 1.0f);
+
         }
 
+    // O framebuffer onde OpenGL executa as operações de renderização não
+    // é o mesmo que está sendo mostrado para o usuário, caso contrário
+    // seria possível ver artefatos conhecidos como "screen tearing". A
+    // chamada abaixo faz a troca dos buffers, mostrando para o usuário
+    // tudo que foi renderizado pelas funções acima.
+    // Veja o link: https://en.wikipedia.org/w/index.php?title=Multiple_buffering&oldid=793452829#Double_buffering_in_computer_graphics
+    glfwSwapBuffers(window);
 
-    /// RENDERIZAÇÃO DO HUD (MIRA) NA TELA
-/*
-        glDisable(GL_DEPTH_TEST);
+    // Verificamos com o sistema operacional se houve alguma interação do
+    // usuário (teclado, mouse, ...). Caso positivo, as funções de callback
+    // definidas anteriormente usando glfwSet*Callback() serão chamadas
+    // pela biblioteca GLFW.
+    glfwPollEvents();
 
-        // Desenhar a mira
-        glBindVertexArray(vertex_array_object_aim);
-        glDrawElements(GL_TRIANGLE_STRIP, 34, GL_UNSIGNED_BYTE, 0);
-
-        // "Desligamos" o VAO, evitando assim que operações posteriores venham a
-        // alterar o mesmo. Isso evita bugs.
-        glBindVertexArray(0);
-
-        glEnable(GL_DEPTH_TEST);
-*/
-
-        if (click){                           //Caso exista disparo
-            /// RENDERIZAÇÃO DO MODELO DA BALA                         Usar? (float)glfwGetTime()
-
-            model = Matrix_Translate(1.0f+ (float)glfwGetTime() * 10.0f ,1.0f, 1.0f)
-            * Matrix_Scale(1.1f,1.1f,1.1f);
-            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-            glUniform1i(g_object_id_uniform, BULLET);
-            DrawVirtualObject("mesh01");
-        }
-
-        TextRendering_ShowFramesPerSecond(window);
-
-        glm::vec4 p_model;
-        float pad = TextRendering_LineHeight(window);
-
-        TextRendering_PrintMatrixVectorProduct(window, model, p_model, -1.0f, 1.0f-2*pad, 1.0f);
-
-        // O framebuffer onde OpenGL executa as operações de renderização não
-        // é o mesmo que está sendo mostrado para o usuário, caso contrário
-        // seria possível ver artefatos conhecidos como "screen tearing". A
-        // chamada abaixo faz a troca dos buffers, mostrando para o usuário
-        // tudo que foi renderizado pelas funções acima.
-        // Veja o link: https://en.wikipedia.org/w/index.php?title=Multiple_buffering&oldid=793452829#Double_buffering_in_computer_graphics
-        glfwSwapBuffers(window);
-
-        // Verificamos com o sistema operacional se houve alguma interação do
-        // usuário (teclado, mouse, ...). Caso positivo, as funções de callback
-        // definidas anteriormente usando glfwSet*Callback() serão chamadas
-        // pela biblioteca GLFW.
-        glfwPollEvents();
-    }
+    } /// While da tela
 
     // Finalizamos o uso dos recursos do sistema operacional
     glfwTerminate();
 
-
-    }
     // Fim do programa
     return 0;
 }
@@ -833,169 +960,6 @@ void ComputeNormals(ObjModel* model)
         model->attrib.normals[3*i + 1] = n.y;
         model->attrib.normals[3*i + 2] = n.z;
     }
-}
-
-GLuint BuildTrianglesForAim(float desloc_x)
-{
-
-    GLfloat NDC_coefficients2[] = {
-    //    X      Y     Z     W
-desloc_x + 0.175f, 0.0f, 0.0f, 1.0f,
-desloc_x + 0.115f, 0.046f, 0.0f, 1.0f,
-desloc_x + 0.16f, 0.065f, 0.0f, 1.0f,
-desloc_x + 0.0875f, 0.0875f, 0.0f, 1.0f,
-desloc_x + 0.1225f, 0.1225f, 0.0f, 1.0f,
-desloc_x + 0.046f, 0.115f, 0.0f, 1.0f,
-desloc_x + 0.0625f, 0.16f, 0.0f, 1.0f,
-desloc_x + 0.0f, 0.125f, 0.0f, 1.0f,
-desloc_x + 0.0f, 0.175f, 0.0f, 1.0f,
-desloc_x -0.046f, 0.115f, 0.0f, 1.0f,
-desloc_x -0.065f, 0.16f, 0.0f, 1.0f,
-desloc_x -0.0875f, 0.0875f, 0.0f, 1.0f,
-desloc_x -0.1225f, 0.1225f, 0.0f, 1.0f,
-desloc_x -0.115f, 0.046f, 0.0f, 1.0f,
-desloc_x -0.16f, 0.065f, 0.0f, 1.0f,
-desloc_x -0.125f, 0.0f, 0.0f, 1.0f,
-desloc_x -0.175f, 0.0f, 0.0f, 1.0f,
-desloc_x -0.115f, -0.046f, 0.0f, 1.0f,
-desloc_x -0.16f, -0.065f, 0.0f, 1.0f,
-desloc_x -0.0875f, -0.0875f, 0.0f, 1.0f,
-desloc_x -0.1225f, -0.1225f, 0.0f, 1.0f,
-desloc_x -0.046f, -0.115f, 0.0f, 1.0f,
-desloc_x -0.065f, -0.16f, 0.0f, 1.0f,
-desloc_x +0.0f, -0.125f, 0.0f, 1.0f,
-desloc_x +0.0f, -0.175f, 0.0f, 1.0f,
-desloc_x +0.046f, -0.115f, 0.0f, 1.0f,
-desloc_x +0.065f, -0.16f, 0.0f, 1.0f,
-desloc_x +0.0875f, -0.0875f, 0.0f, 1.0f,
-desloc_x +0.1225f, -0.1225f, 0.0f, 1.0f,
-desloc_x +0.115f, -0.046f, 0.0f, 1.0f,
-desloc_x +0.16f, -0.065f, 0.0f, 1.0f,
-desloc_x +0.125f, 0.0f, 0.0f, 1.0f
-
-    };
-
-    // Criamos o identificador (ID) de um Vertex Buffer Object (VBO
-    // para armazenarmos um atributo: posição (coeficientes NDC definidos acima).
-    GLuint VBO_NDC_coefficients_id2;
-    glGenBuffers(1, &VBO_NDC_coefficients_id2);
-
-    // Criamos o identificador (ID) de um Vertex Array Object (VAO).  Um VAO
-    // contém a definição de vários atributos de um certo conjunto de vértices;
-    // isto é, um VAO irá conter ponteiros para vários VBOs.
-    GLuint vertex_array_object_id2;
-    glGenVertexArrays(1, &vertex_array_object_id2);
-
-    // "Ligamos" o VAO ("bind"). Informamos que iremos atualizar o VAO cujo ID
-    // está contido na variável "vertex_array_object_id".
-    glBindVertexArray(vertex_array_object_id2);
-
-    // "Ligamos" o VBO ("bind"). Informamos que o VBO cujo ID está contido na
-    // variável VBO_NDC_coefficients_id será modificado a seguir. A
-    // constante "GL_ARRAY_BUFFER" informa que esse buffer é de fato um VBO, e
-    // irá conter atributos de vértices.
-    glBindBuffer(GL_ARRAY_BUFFER, VBO_NDC_coefficients_id2);
-
-    // Alocamos memória para o VBO "ligado" acima.
-    glBufferData(GL_ARRAY_BUFFER, sizeof(NDC_coefficients2), NULL, GL_STATIC_DRAW);
-
-    // Finalmente, copiamos os valores do array NDC_coefficients para dentro do VBO
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(NDC_coefficients2), NDC_coefficients2);
-
-    // Precisamos então informar um índice de "local" ("location"), o qual será
-    // utilizado no shader "shader_vertex.glsl" para acessar os valores
-    // armazenados no VBO "ligado" acima. Também, informamos a dimensão (número de
-    // coeficientes) destes atributos. Como em nosso caso são coordenadas NDC
-    // homogêneas, temos quatro coeficientes por vértice (X,Y,Z,W). Isto define
-    // um tipo de dado chamado de "vec4" em "shader_vertex.glsl": um vetor com
-    // quatro coeficientes. Finalmente, informamos que os dados estão em ponto
-    // flutuante com 32 bits (GL_FLOAT).
-    GLuint location = 0; // "(location = 0)" em "shader_vertex.glsl"
-    GLint  number_of_dimensions = 4; // vec4 em "shader_vertex.glsl"
-    glVertexAttribPointer(location, number_of_dimensions, GL_FLOAT, GL_FALSE, 0, 0);
-
-    // "Ativamos" os atributos. Informamos que os atributos com índice de local
-    // definido acima, na variável "location", deve ser utilizado durante o
-    // rendering.
-    glEnableVertexAttribArray(location);
-
-    // "Desligamos" o VBO, evitando assim que operações posteriores venham a
-    // alterar o mesmo. Isto evita bugs.
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    GLfloat color_coefficients2[] = {
-    //  R     G     B     A
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f, 1.0f
-    };
-
-    GLuint VBO_color_coefficients_id2;
-    glGenBuffers(1, &VBO_color_coefficients_id2);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO_color_coefficients_id2);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(color_coefficients2), NULL, GL_STATIC_DRAW);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(color_coefficients2), color_coefficients2);
-    location = 1; // "(location = 1)" em "shader_vertex.glsl"
-    number_of_dimensions = 4; // vec4 em "shader_vertex.glsl"
-    glVertexAttribPointer(location, number_of_dimensions, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(location);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    // Este vetor "indices" define a TOPOLOGIA
-    GLubyte indices2[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,0,1 }; // GLubyte: valores entre 0 e 255 (8 bits sem sinal).
-
-    // Criamos um buffer OpenGL para armazenar os índices acima
-    GLuint indices_id2;
-    glGenBuffers(1, &indices_id2);
-
-    // "Ligamos" o buffer. Note que o tipo agora é GL_ELEMENT_ARRAY_BUFFER.
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices_id2);
-
-    // Alocamos memória para o buffer.
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices2), NULL, GL_STATIC_DRAW);
-
-    // Copiamos os valores do array indices[] para dentro do buffer.
-    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, sizeof(indices2), indices2);
-
-    // "Desligamos" o VAO, evitando assim que operações posteriores venham a
-    // alterar o mesmo. Isso evita bugs.
-    glBindVertexArray(0);
-
-    // Retornamos o ID do VAO. Isso é tudo que será necessário para renderizar
-    // os triângulos definidos acima. Veja a chamada glDrawElements() em main().
-    return vertex_array_object_id2;
-
 }
 
 // Constrói triângulos para futura renderização a partir de um ObjModel.
@@ -1291,6 +1255,48 @@ GLuint CreateGpuProgram(GLuint vertex_shader_id, GLuint fragment_shader_id)
     return program_id;
 }
 
+glm::mat4 RodriguesMatrix (glm::vec3 v, float c, float s){
+
+    glm::mat4 Rotation;
+
+    Rotation[0][0] = v.x * v.x * (1.0f - c) + c         ; Rotation[0][1] = v.x * v.y * (1.0f - c) - v.z * s     ; Rotation[0][2] = v.x * v.z * (1.0f - c) - v.y * s     ; Rotation[0][3] = 0.0f;
+    Rotation[1][0] = v.x * v.y * (1.0f - c) + v.z * s   ; Rotation[1][1] = v.y * v.y * (1.0f - c) + c           ; Rotation[1][2] = v.y * v.z * (1.0f - c) - v.x * s     ; Rotation[1][3] = 0.0f;
+    Rotation[2][0] = v.x * v.z * (1.0f - c) - v.y * s   ; Rotation[2][1] = v.y * v.z * (1.0f - c) + v.x * s     ; Rotation[2][2] = v.z * v.z * (1.0f - c) + c           ; Rotation[2][3] = 0.0f;
+    Rotation[3][0] = 0.0f                               ; Rotation[3][1] = 0.0f                                 ; Rotation[3][2] = 0.0f                                 ; Rotation[3][3] = 1.0f;
+
+    return Rotation;
+
+}
+
+
+/// >> FONTE <<
+/// https://medium.com/geekculture/2d-and-3d-b%C3%A9zier-curves-in-c-499093ef45a9
+
+std::tuple<std::vector<double>, std::vector<double>, std::vector<double>> BezierCurves(std::vector<double> xX, std::vector<double> yY, std::vector<double> zZ)
+{
+
+    std::vector<double> bCurveX;
+    std::vector<double> bCurveY;
+    std::vector<double> bCurveZ;
+    double bCurveXt;
+    double bCurveYt;
+    double bCurveZt;
+
+    for (double t = 0.01; t <= 1; t += 0.02)
+    {
+
+        bCurveXt = std::pow((1 - t), 3) * xX[0] + 3 * std::pow((1 - t), 2) * t * xX[1] + 3 * std::pow((1 - t), 1) * std::pow(t, 2) * xX[2] + std::pow(t, 3) * xX[3];
+        bCurveYt = std::pow((1 - t), 3) * yY[0] + 3 * std::pow((1 - t), 2) * t * yY[1] + 3 * std::pow((1 - t), 1) * std::pow(t, 2) * yY[2] + std::pow(t, 3) * yY[3];
+        bCurveZt = std::pow((1 - t), 3) * yY[0] + 3 * std::pow((1 - t), 2) * t * yY[1] + 3 * std::pow((1 - t), 1) * std::pow(t, 2) * yY[2] + std::pow(t, 3) * yY[3];
+
+        bCurveX.push_back(bCurveXt);
+        bCurveY.push_back(bCurveYt);
+        bCurveZ.push_back(bCurveZt);
+    }
+
+    return std::make_tuple(bCurveX, bCurveY, bCurveZ);
+}
+
 // Definição da função que será chamada sempre que a janela do sistema
 // operacional for redimensionada, por consequência alterando o tamanho do
 // "framebuffer" (região de memória onde são armazenados os pixels da imagem).
@@ -1320,118 +1326,63 @@ double g_LastCursorPosX, g_LastCursorPosY;
 // Função callback chamada sempre que o usuário aperta algum dos botões do mouse
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
+
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
-    {
-        // Se o usuário pressionou o botão esquerdo do mouse, guardamos a
-        // posição atual do cursor nas variáveis g_LastCursorPosX e
-        // g_LastCursorPosY.  Também, setamos a variável
-        // g_LeftMouseButtonPressed como true, para saber que o usuário está
-        // com o botão esquerdo pressionado.
-        glfwGetCursorPos(window, &g_LastCursorPosX, &g_LastCursorPosY);
-        g_LeftMouseButtonPressed = true;
-    }
+        click = true;
+
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
     {
-        // Quando o usuário soltar o botão esquerdo do mouse, atualizamos a
-        // variável abaixo para false.
         g_LeftMouseButtonPressed = false;
+        click = false;
     }
     if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
     {
-        // Se o usuário pressionou o botão esquerdo do mouse, guardamos a
-        // posição atual do cursor nas variáveis g_LastCursorPosX e
-        // g_LastCursorPosY.  Também, setamos a variável
-        // g_RightMouseButtonPressed como true, para saber que o usuário está
-        // com o botão esquerdo pressionado.
         glfwGetCursorPos(window, &g_LastCursorPosX, &g_LastCursorPosY);
         g_RightMouseButtonPressed = true;
     }
     if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE)
-    {
-        // Quando o usuário soltar o botão esquerdo do mouse, atualizamos a
-        // variável abaixo para false.
         g_RightMouseButtonPressed = false;
-    }
+
     if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS)
     {
-        // Se o usuário pressionou o botão esquerdo do mouse, guardamos a
-        // posição atual do cursor nas variáveis g_LastCursorPosX e
-        // g_LastCursorPosY.  Também, setamos a variável
-        // g_MiddleMouseButtonPressed como true, para saber que o usuário está
-        // com o botão esquerdo pressionado.
         glfwGetCursorPos(window, &g_LastCursorPosX, &g_LastCursorPosY);
         g_MiddleMouseButtonPressed = true;
     }
     if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_RELEASE)
-    {
-        // Quando o usuário soltar o botão esquerdo do mouse, atualizamos a
-        // variável abaixo para false.
         g_MiddleMouseButtonPressed = false;
-    }
 }
 
 // Função callback chamada sempre que o usuário movimentar o cursor do mouse em
 // cima da janela OpenGL.
 void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
 {
-    // Abaixo executamos o seguinte: caso o botão esquerdo do mouse esteja
-    // pressionado, computamos quanto que o mouse se movimento desde o último
-    // instante de tempo, e usamos esta movimentação para atualizar os
-    // parâmetros que definem a posição da câmera dentro da cena virtual.
-    // Assim, temos que o usuário consegue controlar a câmera.
+    if (g_RightMouseButtonPressed){
 
-    if (g_LeftMouseButtonPressed)
-    {
-        // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
-        float dx = xpos - g_LastCursorPosX;
-        float dy = ypos - g_LastCursorPosY;
+        //if(!In_Menu){
 
-        // Atualizamos parâmetros da câmera com os deslocamentos
-        g_CameraTheta -= 0.01f*dx;
-        g_CameraPhi   += 0.01f*dy;
+            // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
+            float dx = xpos - g_LastCursorPosX;
+            float dy = ypos - g_LastCursorPosY;
 
-        // Em coordenadas esféricas, o ângulo phi deve ficar entre -pi/2 e +pi/2.
-        float phimax = 3.141592f/2;
-        float phimin = -phimax;
+            // Atualizamos parâmetros da câmera com os deslocamentos
+            g_CameraTheta -= 0.01f*dx;
+            g_CameraPhi   += 0.01f*dy;
 
-        if (g_CameraPhi > phimax)
-            g_CameraPhi = phimax;
+            // Em coordenadas esféricas, o ângulo phi deve ficar entre -pi/2 e +pi/2.
+            float phimax = 3.141592f/2;
+            float phimin = -phimax;
 
-        if (g_CameraPhi < phimin)
-            g_CameraPhi = phimin;
+            if (g_CameraPhi > phimax)
+                g_CameraPhi = phimax;
 
-        // Atualizamos as variáveis globais para armazenar a posição atual do
-        // cursor como sendo a última posição conhecida do cursor.
-        g_LastCursorPosX = xpos;
-        g_LastCursorPosY = ypos;
+            if (g_CameraPhi < phimin)
+                g_CameraPhi = phimin;
 
-        //Disparo----------------------
-        click=true;
-        //-----------------------------
-    }
-
-    if (g_RightMouseButtonPressed)
-    {
-        // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
-        float dx = xpos - g_LastCursorPosX;
-        float dy = ypos - g_LastCursorPosY;
-
-        // Atualizamos as variáveis globais para armazenar a posição atual do
-        // cursor como sendo a última posição conhecida do cursor.
-        g_LastCursorPosX = xpos;
-        g_LastCursorPosY = ypos;
-    }
-
-    if (g_MiddleMouseButtonPressed)
-    {
-        // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
-        float dx = xpos - g_LastCursorPosX;
-        float dy = ypos - g_LastCursorPosY;
-
-        // Atualizamos as variáveis globais para armazenar a posição atual do
-        // cursor como sendo a última posição conhecida do cursor.
-        g_LastCursorPosX = xpos;
-        g_LastCursorPosY = ypos;
+            // Atualizamos as variáveis globais para armazenar a posição atual do
+            // cursor como sendo a última posição conhecida do cursor.
+            g_LastCursorPosX = xpos;
+            g_LastCursorPosY = ypos;
+        //}
     }
 }
 
@@ -1483,6 +1434,13 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
         fprintf(stdout,"Shaders recarregados!\n");
         fflush(stdout);
     }
+    // Se o usuário apertar a tecla ENTER, sai do menu para começar o jogo.
+    if (key == GLFW_KEY_ENTER && action == GLFW_PRESS)
+    {
+        In_Menu = false;
+    }
+
+
     //MOVIMENTAÇÃO  ----------------------------
     if (key == GLFW_KEY_W)
     {
@@ -1522,13 +1480,6 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mod)
             move_up = true;
         else if (action == GLFW_RELEASE)
             move_up = false;
-        else if (action == GLFW_REPEAT);
-    }
-    if (key == GLFW_KEY_C){
-        if (action == GLFW_PRESS)
-            move_down = true;
-        else if (action == GLFW_RELEASE)
-            move_down = false;
         else if (action == GLFW_REPEAT);
     }
     //----------------------------------------

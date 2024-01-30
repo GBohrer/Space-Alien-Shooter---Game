@@ -21,11 +21,12 @@ uniform mat4 projection;
 
 // Identificador que define qual objeto está sendo desenhado no momento
 #define SPHERE 0
-#define BUNNY  1
 #define PLANE  2
 #define GUN    3
 #define ALIEN  4
+#define AIM    5
 #define BULLET 6
+#define TITLE  7
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -36,7 +37,6 @@ uniform vec4 bbox_max;
 uniform sampler2D TextureImage0;
 uniform sampler2D TextureImage1;
 uniform sampler2D TextureImage2;
-uniform sampler2D TextureImage3;
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec4 color;
@@ -113,31 +113,6 @@ void main()
         V = (phi + M_PI_2) / M_PI;
 
     }
-    else if ( object_id == BUNNY )
-    {
-        // PREENCHA AQUI as coordenadas de textura do coelho, computadas com
-        // projeção planar XY em COORDENADAS DO MODELO. Utilize como referência
-        // o slides 99-104 do documento Aula_20_Mapeamento_de_Texturas.pdf,
-        // e também use as variáveis min*/max* definidas abaixo para normalizar
-        // as coordenadas de textura U e V dentro do intervalo [0,1]. Para
-        // tanto, veja por exemplo o mapeamento da variável 'p_v' utilizando
-        // 'h' no slides 158-160 do documento Aula_20_Mapeamento_de_Texturas.pdf.
-        // Veja também a Questão 4 do Questionário 4 no Moodle.
-
-        float minx = bbox_min.x;
-        float maxx = bbox_max.x;
-
-        float miny = bbox_min.y;
-        float maxy = bbox_max.y;
-
-        float minz = bbox_min.z;
-        float maxz = bbox_max.z;
-
-        // Map the bunny model's XY coordinates to texture coordinates
-        U = (position_model.x - minx) / (maxx - minx);
-        V = (position_model.y - miny) / (maxy - miny);
-
-    }
     else
     {
         // Coordenadas de textura do plano, obtidas do arquivo OBJ.
@@ -146,10 +121,9 @@ void main()
     }
 
     // Obtemos a refletância difusa a partir da leitura da imagem TextureImage0
-    vec3 Kd0 = texture(TextureImage0, vec2(U,V)).rgb; // terra
+    vec3 Kd0 = texture(TextureImage0, vec2(U,V)).rgb; // alien
     vec3 Kd1 = texture(TextureImage1, vec2(U,V)).rgb; //galaxia
     vec3 Kd2 = texture(TextureImage2, vec2(U,V)).rgb; //chão
-    //vec3 Kd3 = texture(TextureImage3, vec2(U,V)).rgb; //gun antes de iluminação
 
     // Equação de Iluminação
     float lambert = max(0,dot(n,l));
@@ -162,6 +136,12 @@ void main()
     }
     else if(object_id == BULLET){
         color.rgb = vec3(0.0f, 0.0f, 1.0f);
+    }
+    else if(object_id == AIM){
+        color.rgb = vec3(1.0f, 0.0f, 0.0f);
+    }
+    else if(object_id == AIM){
+        color.rgb = vec3(1.0f, 0.0f, 0.0f);
     }
     else if(object_id == GUN){
         color.rgb = cor_v.rgb;

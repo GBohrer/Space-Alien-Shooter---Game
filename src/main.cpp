@@ -242,6 +242,7 @@ int Player_Kill_Count   = 0;
 float Player_Speed_mod  = 0.5f;
 bool Player_is_alive    = true;
 struct cubo_t Player_Hitbox;
+bool isdown=false;
 
 // Atributos Alien
 int Alien_In_Game           = 0;
@@ -673,7 +674,11 @@ int main(int argc, char* argv[])
             if(move_camera_D)
                 camera_position_general -= u * Player_Speed_mod;
 
-            if(move_up)
+            if(camera_position_general.y >= 30.0f){
+                isdown=true;
+            }
+
+            if(move_up && !isdown)
                 camera_position_general.y += camera_up_vector.y * 2.0f;
 
 
@@ -691,8 +696,11 @@ int main(int argc, char* argv[])
             //-----------------------
 
             // Teste do player com o chao
-            if(!ColisaoPontoPlano(camera_position_general.y,-1.0f))
+            if(!ColisaoPontoPlano(camera_position_general.y,-1.0f)){
                 camera_position_general += -camera_up_vector * 0.5f;
+            }else{
+                isdown=false;
+            }
 
 
             for (int alien = 0; alien < Alien_In_Game; alien++ ){

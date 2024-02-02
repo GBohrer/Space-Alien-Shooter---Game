@@ -558,9 +558,10 @@ int main(int argc, char* argv[])
 
                 // Calcular o vetor v de rotacao e o angulo theta para passar na matriz de rotação de rodrigues
 
-                model = Matrix_Translate(Alien_Models_X[d] + 14.5f, 13.0f, Alien_Models_Z[d] + 8.0f)*
-                Matrix_Scale(10.0f,10.0f,10.0f);
+               // model = Matrix_Translate(Alien_Models_X[d] + 14.5f, 13.0f, Alien_Models_Z[d] + 8.0f)*
+                //Matrix_Scale(10.0f,10.0f,10.0f);
  //    -------> RodriguesMatrix();
+
 
                 glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
                 glUniform1i(g_object_id_uniform, ALIEN);
@@ -569,7 +570,7 @@ int main(int argc, char* argv[])
                 // Hitbox esféricas dos aliens
                 sphere_t s;
                 s.position = glm::vec3 (Alien_Models_X[d], 10.0f, Alien_Models_Z[d]);
-                s.radius = 5;
+                s.radius = 7;
                 Alien_Hitboxes.push_back(s);
 
                 model = Matrix_Translate(Alien_Models_X[d], 10.0f, Alien_Models_Z[d]) * Matrix_Scale(5.0f, 5.0f, 5.0f);
@@ -580,6 +581,8 @@ int main(int argc, char* argv[])
                 // Deslocamento em direcao ao Player
                 Alien_Models_X[d] += (camera_position_general.x - Alien_Models_X[d]) * Alien_speed_mod * delta_t;
                 Alien_Models_Z[d] += (camera_position_general.z - Alien_Models_Z[d]) * Alien_speed_mod * delta_t;
+
+                //printf("%.2f %.2f %.2f\n", Alien_Hitboxes[d].position.x,Alien_Hitboxes[d].position.y,Alien_Hitboxes[d].position.z , Alien_Hitboxes[d].radius);
 
             }
 
@@ -709,7 +712,7 @@ int main(int argc, char* argv[])
 
                 if (ColisaoCuboEsfera(Player_Hitbox, &Alien_Hitboxes[alien])){
 
-                       printf("colisao");
+                       printf("COLISAO\n");
                        //exit();
                 }
 
@@ -730,6 +733,8 @@ int main(int argc, char* argv[])
                     }
                 }
             }
+            Alien_Hitboxes.clear();   //limpa o vetor com as posições antigas , para adicionar as novas depois
+
 
 
             // Imprime na tela informações

@@ -243,6 +243,7 @@ float Player_Speed_mod  = 0.5f;
 bool Player_is_alive    = true;
 struct cubo_t Player_Hitbox;
 bool isdown=false;
+float playerLife = 100.0f;
 
 // Atributos Alien
 int Alien_In_Game           = 0;
@@ -588,27 +589,29 @@ int main(int argc, char* argv[])
 
         /// RENDERIZAÇÃO DO MODELO DA BALA
 
-            //Caso exista disparo, gera uma nova bullet
-            if (click){
 
-                // Confere se a bullet já saiu do cenário
+            // Confere se a bullet já saiu do cenário
                 // Caso sim, deleta sua posicao
+
                 for (int b = 0; b < Bullet_In_Game; b++){
                     if (abs(Bullet_Models_X[b] - camera_position_general.x) > 100.0f ||
                         abs(Bullet_Models_Y[b] - camera_position_general.y) > 100.0f ||
                         abs(Bullet_Models_Z[b] - camera_position_general.z) > 100.0f   ){
-
                         Bullet_Models_X.erase(Bullet_Models_X.begin() + b);
                         Bullet_Models_Y.erase(Bullet_Models_Y.begin() + b);
                         Bullet_Models_Z.erase(Bullet_Models_Z.begin() + b);
                         Bullet_view_vector_X.erase(Bullet_view_vector_X.begin() + b);
                         Bullet_view_vector_Y.erase(Bullet_view_vector_Y.begin() + b);
                         Bullet_view_vector_Z.erase(Bullet_view_vector_Z.begin() + b);
-                        Bullet_Hitboxes.erase(Bullet_Hitboxes.begin() + b);
 
                         Bullet_In_Game--;
                     }
                 }
+
+
+
+            //Caso exista disparo, gera uma nova bullet
+            if (click){
 
                 // Gera uma nova posicao inicial de bullet se a quantidade de bullets no jogo for menor que o desejado
                 // Guarda esta posicao (Matrix_Translate) em Bullet_Models
@@ -635,7 +638,6 @@ int main(int argc, char* argv[])
                 Bullet_Models_X[b] += ( Bullet_view_vector_X[b]) * delta_t * 40;
                 Bullet_Models_Y[b] += ( Bullet_view_vector_Y[b]) * delta_t * 40;
                 Bullet_Models_Z[b] += ( Bullet_view_vector_Z[b]) * delta_t * 40;
-
                 glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
                 glUniform1i(g_object_id_uniform, BULLET);
                 DrawVirtualObject("mesh01");
@@ -712,10 +714,16 @@ int main(int argc, char* argv[])
 
                 if (ColisaoCuboEsfera(Player_Hitbox, &Alien_Hitboxes[alien])){
 
-                       printf("COLISAO\n");
-                       //exit();
+                       playerLife -= 5.0f;
+                       printf("COLISAO vida do player = %.2f \n", playerLife);
+
+                       if(playerLife == 0){
+                        //matar o personagem
+                        //exit();
+                       }
                 }
 
+                if(Bullet_In_Game != 0){
                 for (int bullet = 0; bullet < Bullet_In_Game; bullet++ ){
 
                     // Se houver colisão entre algum alien e alguma bullet
@@ -727,15 +735,18 @@ int main(int argc, char* argv[])
 
                         Alien_Models_X.erase(Alien_Models_X.begin() + alien);
                         Alien_Models_Z.erase(Alien_Models_Z.begin() + alien);
-                        Alien_Hitboxes.erase(Alien_Hitboxes.begin() + alien);
+                        Alien_In_Game=0;                                     // DESCOBRIR COMO AJUSTAR
+
 
                         Player_Kill_Count++;
                     }
-                }
+                }}
             }
             Alien_Hitboxes.clear();   //limpa o vetor com as posições antigas , para adicionar as novas depois
 
-
+            if(Bullet_In_Game != 0){
+                Bullet_Hitboxes.clear();
+            }
 
             // Imprime na tela informações
             TextRendering_ShowFramesPerSecond(window);

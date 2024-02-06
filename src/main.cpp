@@ -131,7 +131,7 @@ void PrintObjModelInfo(ObjModel*); // Função para debugging
 
 std::tuple<std::vector<double>, std::vector<double>, std::vector<double>> BezierCurves(std::vector<double> xX, std::vector<double> yY, std::vector<double> zZ);
 glm::mat4 RodriguesMatrix (glm::vec3 vv, float c, float s);
-
+void Reset_game();
 
 // Declaração de funções auxiliares para renderizar texto dentro da janela
 // OpenGL. Estas funções estão definidas no arquivo "textrendering.cpp".
@@ -238,28 +238,23 @@ GLuint g_NumLoadedTextures = 0;
 /// VARIÁVEIS GAMEPLAY
 
 // Atributos Player
-int Player_Kill_Count   = 0;
+int Player_Score_Count   = 0;
 float Player_Speed_mod  = 0.5f;
-bool Player_is_alive    = true;
 struct cubo_t Player_Hitbox;
-bool isdown=false;
-float playerLife = 100.0f;
+bool isdown             = false;
 
 // Atributos Alien
 int Alien_In_Game           = 0;
 int Alien_Spawn_Qtd         = 4;
-int Alien_Health            = 100;
 float Alien_speed_mod       = 0.2f;
 float Alien_Spawn_Min_Range = 250.0f;
-
-// Lista com os 4 modelos (Matrix_Translate) dos aliens atuais no jogo
 std::vector<float> Alien_Models_X;
 std::vector<float> Alien_Models_Z;
 std::vector<sphere_t> Alien_Hitboxes;
 
 // Atributos bullet
-int Bullet_In_Game  = 0;
-int Bullet_Qtd      = 2;
+int Bullet_In_Game      = 0;
+int Bullet_Qtd          = 1;
 std::vector<float> Bullet_Models_X;
 std::vector<float> Bullet_Models_Y;
 std::vector<float> Bullet_Models_Z;
@@ -269,12 +264,12 @@ std::vector<float> Bullet_view_vector_Z;
 std::vector<sphere_t> Bullet_Hitboxes;
 
 // Variáveis de tempo para animação
-float animation_t_prev = (float)glfwGetTime();
+float animation_t_prev;
 float animation_t_now = 0;
 float delta_t = 0;
 
 bool In_Menu = true;
-
+bool Difficult_inc = false;
 
 int main(int argc, char* argv[])
 {
@@ -382,9 +377,9 @@ int main(int argc, char* argv[])
     ComputeNormals(&bulletmodel);
     BuildTrianglesAndAddToVirtualScene(&bulletmodel);
 
-    //ObjModel titlemodel("../../data/title.obj");
-   // ComputeNormals(&titlemodel);
-    //BuildTrianglesAndAddToVirtualScene(&titlemodel);
+    ObjModel titlemodel("../../data/title.obj");
+    ComputeNormals(&titlemodel);
+    BuildTrianglesAndAddToVirtualScene(&titlemodel);
 
     if ( argc > 1 )
     {
@@ -407,6 +402,7 @@ int main(int argc, char* argv[])
     while (!glfwWindowShouldClose(window))
     {
 
+    //try{
             // Definimos a cor do "fundo" do framebuffer como branco.
             glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -477,7 +473,6 @@ int main(int argc, char* argv[])
             glUniformMatrix4fv(g_projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
 
             #define SPHERE 0
-            #define BUNNY  1
             #define PLANE  2
             #define GUN    3
             #define ALIEN  4
@@ -512,13 +507,18 @@ int main(int argc, char* argv[])
 
             /// RENDERIZAÇÃO DO TITULO
 
-            //model = Matrix_Translate(0.0f,12.0f,0.0f) * Matrix_Scale(20.0f, 20.0f, 20.0f) * Matrix_Rotate_X(1.54f);
-            //glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-            //glUniform1i(g_object_id_uniform, TITLE);
-            //DrawVirtualObject("title");
+            model = Matrix_Translate(0.0f,12.0f,0.0f) * Matrix_Scale(20.0f, 20.0f, 20.0f) * Matrix_Rotate_X(1.54f) * Matrix_Rotate_Z((float)glfwGetTime() * 0.1f);
+            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, TITLE);
+            DrawVirtualObject("title");
 
-            TextRendering_PrintString(window, "Pressione ENTER", 0.0f, 0.0f, 1.5f);
+            TextRendering_PrintString(window,"Press ENTER", -0.2f, -0.2f, 2.0f);
+            TextRendering_PrintString(window,"[W A S D] -> Move", -0.4f, -0.4f, 2.0f);
+            TextRendering_PrintString(window,"[MOUSE LEFT] -> Shoot", -0.4f, -0.5f, 2.0f);
+            TextRendering_PrintString(window,"[MOUSE RIGHT] -> Aim", -0.4f, -0.6f, 2.0f);
+            TextRendering_PrintString(window,"[space] -> Jump", -0.4f, -0.7f, 2.0f);
         } else {
+
 
         /// RENDERIZAÇÃO DO MODELO DA ARMA
 
@@ -559,33 +559,30 @@ int main(int argc, char* argv[])
 
                 // Calcular o vetor v de rotacao e o angulo theta para passar na matriz de rotação de rodrigues
 
-               // model = Matrix_Translate(Alien_Models_X[d] + 14.5f, 13.0f, Alien_Models_Z[d] + 8.0f)*
-                //Matrix_Scale(10.0f,10.0f,10.0f);
+                model = Matrix_Translate(Alien_Models_X[d] + 14.5f, 10.0f, Alien_Models_Z[d] + 8.0f)*
+                        Matrix_Scale(10.0f,10.0f,10.0f);
  //    -------> RodriguesMatrix();
-
 
                 glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
                 glUniform1i(g_object_id_uniform, ALIEN);
-                DrawVirtualObject("alien");
+                DrawVirtualObject("object_0");
 
                 // Hitbox esféricas dos aliens
                 sphere_t s;
                 s.position = glm::vec3 (Alien_Models_X[d], 10.0f, Alien_Models_Z[d]);
-                s.radius = 7;
+                s.radius = 5;
                 Alien_Hitboxes.push_back(s);
 
-                model = Matrix_Translate(Alien_Models_X[d], 10.0f, Alien_Models_Z[d]) * Matrix_Scale(5.0f, 5.0f, 5.0f);
-                glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-                glUniform1i(g_object_id_uniform, SPHERE);
-                DrawVirtualObject("the_sphere");
+                //model = Matrix_Translate(Alien_Models_X[d], 10.0f, Alien_Models_Z[d]) * Matrix_Scale(5.0f, 5.0f, 5.0f);
+                //glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+                //glUniform1i(g_object_id_uniform, SPHERE);
+                //DrawVirtualObject("the_sphere");
 
                 // Deslocamento em direcao ao Player
                 Alien_Models_X[d] += (camera_position_general.x - Alien_Models_X[d]) * Alien_speed_mod * delta_t;
                 Alien_Models_Z[d] += (camera_position_general.z - Alien_Models_Z[d]) * Alien_speed_mod * delta_t;
-
-                //printf("%.2f %.2f %.2f\n", Alien_Hitboxes[d].position.x,Alien_Hitboxes[d].position.y,Alien_Hitboxes[d].position.z , Alien_Hitboxes[d].radius);
-
             }
+
 
         /// RENDERIZAÇÃO DO MODELO DA BALA
 
@@ -594,9 +591,11 @@ int main(int argc, char* argv[])
                 // Caso sim, deleta sua posicao
 
                 for (int b = 0; b < Bullet_In_Game; b++){
-                    if (abs(Bullet_Models_X[b] - camera_position_general.x) > 100.0f ||
-                        abs(Bullet_Models_Y[b] - camera_position_general.y) > 100.0f ||
-                        abs(Bullet_Models_Z[b] - camera_position_general.z) > 100.0f   ){
+
+                    if (abs(Bullet_Models_X[b] - camera_position_general.x) > 200.0f ||
+                        abs(Bullet_Models_Y[b] - camera_position_general.y) > 200.0f ||
+                        abs(Bullet_Models_Z[b] - camera_position_general.z) > 200.0f   ){
+
                         Bullet_Models_X.erase(Bullet_Models_X.begin() + b);
                         Bullet_Models_Y.erase(Bullet_Models_Y.begin() + b);
                         Bullet_Models_Z.erase(Bullet_Models_Z.begin() + b);
@@ -607,8 +606,6 @@ int main(int argc, char* argv[])
                         Bullet_In_Game--;
                     }
                 }
-
-
 
             //Caso exista disparo, gera uma nova bullet
             if (click){
@@ -638,6 +635,7 @@ int main(int argc, char* argv[])
                 Bullet_Models_X[b] += ( Bullet_view_vector_X[b]) * delta_t * 40;
                 Bullet_Models_Y[b] += ( Bullet_view_vector_Y[b]) * delta_t * 40;
                 Bullet_Models_Z[b] += ( Bullet_view_vector_Z[b]) * delta_t * 40;
+
                 glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
                 glUniform1i(g_object_id_uniform, BULLET);
                 DrawVirtualObject("mesh01");
@@ -689,73 +687,85 @@ int main(int argc, char* argv[])
 
        /// TESTES DE COLISÃO
 
-            //atualizando hitbox player
-
-            Player_Hitbox.depth=2.0f;
-            Player_Hitbox.height=2.0f;
-            Player_Hitbox.width=2.0f;
+            // Atualizacao da hitbox player
+            Player_Hitbox.depth = 2.0f;
+            Player_Hitbox.height = 2.0f;
+            Player_Hitbox.width = 2.0f;
             Player_Hitbox.position.x = camera_position_general.x;
             Player_Hitbox.position.y = camera_position_general.y;
             Player_Hitbox.position.z = camera_position_general.z;
 
-            //-----------------------
-
             // Teste do player com o chao
-            if(!ColisaoPontoPlano(camera_position_general.y,-1.0f)){
+            if (!ColisaoPontoPlano(camera_position_general.y,-1.0f)){
                 camera_position_general += -camera_up_vector * 0.5f;
             }else{
-                isdown=false;
+                isdown = false;
             }
-
 
             for (int alien = 0; alien < Alien_In_Game; alien++ ){
 
-               // Se houver colisao entre algum alien e o player
-
-                if (ColisaoCuboEsfera(Player_Hitbox, &Alien_Hitboxes[alien])){
-
-                       playerLife -= 5.0f;
-                       printf("COLISAO vida do player = %.2f \n", playerLife);
-
-                       if(playerLife == 0){
-                        //matar o personagem
-                        //exit();
-                       }
-                }
-
                 if(Bullet_In_Game != 0){
-                for (int bullet = 0; bullet < Bullet_In_Game; bullet++ ){
+                    for (int bullet = 0; bullet < Bullet_In_Game; bullet++ ){
 
                     // Se houver colisão entre algum alien e alguma bullet
+                        if (ColisaoEsferaEsfera(&Alien_Hitboxes[alien], &Bullet_Hitboxes[bullet]) ){
 
-                    /// ATENÇÃO! COLISÃO COM BUG. ANALISAR E DESCOBRIR O ERRO
+                        // Gera um novo alien
+                            float Alien_spawn_desloc = rand()%360+1;
+                            float spawn_x = camera_position_general.x + Alien_Spawn_Min_Range * cos(Alien_spawn_desloc);
+                            float spawn_z = camera_position_general.z + Alien_Spawn_Min_Range * sin(Alien_spawn_desloc);
 
-                    if (ColisaoEsferaEsfera(&Alien_Hitboxes[alien], &Bullet_Hitboxes[bullet]) ){
-                        printf("BATEU");
+                            Alien_Models_X.insert(Alien_Models_X.begin() + alien, spawn_x);
+                            Alien_Models_Z.insert(Alien_Models_Z.begin() + alien, spawn_z);
+                            //Alien_Hitboxes.erase(Alien_Hitboxes.begin() + alien);
 
-                        Alien_Models_X.erase(Alien_Models_X.begin() + alien);
-                        Alien_Models_Z.erase(Alien_Models_Z.begin() + alien);
-                        Alien_In_Game=0;                                     // DESCOBRIR COMO AJUSTAR
-
-
-                        Player_Kill_Count++;
+                            Player_Score_Count++;
+                            Difficult_inc = true;
+                            Alien_In_Game=0; //forçar tambem evita bugs
+                        }
                     }
-                }}
+                }
+            // Se houver colisao entre algum alien e o player, volta para o Menu
+                if (ColisaoCuboEsfera(Player_Hitbox, &Alien_Hitboxes[alien])){
+                    Reset_game();
+                }
+
             }
             Alien_Hitboxes.clear();   //limpa o vetor com as posições antigas , para adicionar as novas depois
+            Bullet_Hitboxes.clear();
 
-            if(Bullet_In_Game != 0){
-                Bullet_Hitboxes.clear();
+
+        /// AUMENTO DA DIFICULDADE DO JOGO
+            if ( Player_Score_Count % 10 == 0 && Difficult_inc ){
+
+                if (Player_Score_Count % 20 == 0){
+                    Alien_Spawn_Qtd += 1;
+                    Bullet_Qtd += 1;
+                }
+
+                //Alien_Spawn_Min_Range -= 4.0f;
+                Alien_speed_mod += 0.05f;
+                Player_Speed_mod += 0.1f;
+
+                Difficult_inc = false;
             }
+
 
             // Imprime na tela informações
             TextRendering_ShowFramesPerSecond(window);
 
-            glm::vec4 p_model;
-            float pad = TextRendering_LineHeight(window);
-            TextRendering_PrintMatrixVectorProduct(window, model, p_model, -1.0f, 1.0f-2*pad, 1.0f);
+            static char  scores_buffer[20] = " Kills: ???";
+            static int   numchars = 7;
+
+            numchars = snprintf(scores_buffer, 20, "Score:: %d", Player_Score_Count);
+
+            float lineheight = TextRendering_LineHeight(window);
+            float charwidth = TextRendering_CharWidth(window);
+
+            TextRendering_PrintString(window, scores_buffer, -0.7f-(numchars + 1)*charwidth, -0.7f-lineheight, 2.0f);
 
         }
+
 
     // O framebuffer onde OpenGL executa as operações de renderização não
     // é o mesmo que está sendo mostrado para o usuário, caso contrário
@@ -1602,7 +1612,7 @@ void TextRendering_ShowFramesPerSecond(GLFWwindow* window)
     // subsequentes da função!
     static float old_seconds = (float)glfwGetTime();
     static int   ellapsed_frames = 0;
-    static char  buffer[20] = "?? fps";
+    static char  buffer[20] = "??? fps";
     static int   numchars = 7;
 
     ellapsed_frames += 1;
@@ -1798,4 +1808,35 @@ void PrintObjModelInfo(ObjModel* model)
 
 // set makeprg=cd\ ..\ &&\ make\ run\ >/dev/null
 // vim: set spell spelllang=pt_br :
+
+
+void Reset_game() {
+
+    In_Menu                 = true;
+    Difficult_inc           = false;
+    Player_Score_Count       = 0;
+    Player_Speed_mod        = 0.5f;
+    Alien_Spawn_Qtd         = 4;
+    Alien_speed_mod         = 0.2f;
+    Alien_Spawn_Min_Range   = 250.0f;
+
+    animation_t_now = 0;
+    delta_t = 0;
+
+    Bullet_Models_X.clear();
+    Bullet_Models_Y.clear();
+    Bullet_Models_Z.clear();
+    Bullet_view_vector_X.clear();
+    Bullet_view_vector_Y.clear();
+    Bullet_view_vector_Z.clear();
+    Bullet_In_Game = 0;
+    Bullet_Qtd = 1;
+
+    Alien_Models_X.clear();
+    Alien_Models_Z.clear();
+    Alien_In_Game = 0;
+
+    camera_position_general = glm::vec4(0.0f,8.0f,0.0f,1.0f);
+
+}
 

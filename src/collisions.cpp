@@ -5,7 +5,7 @@ bool ColisaoPontoPlano(float yp, float yc){
     float altura = 6;
     bool colisao = false;
 
-    if(yp == altura + yc){
+    if(yp <= altura + yc){
         colisao = true;
     }
     return colisao;

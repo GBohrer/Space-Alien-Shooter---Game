@@ -32,6 +32,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <algorithm>
+#include <chrono>
+#include <thread>
 
 // Headers das bibliotecas OpenGL
 #include <glad/glad.h>   // Criação de contexto OpenGL 3.3
@@ -129,9 +131,12 @@ void LoadShader(const char* filename, GLuint shader_id); // Função utilizada p
 GLuint CreateGpuProgram(GLuint vertex_shader_id, GLuint fragment_shader_id); // Cria um programa de GPU
 void PrintObjModelInfo(ObjModel*); // Função para debugging
 
-std::tuple<std::vector<double>, std::vector<double>, std::vector<double>> BezierCurves(std::vector<double> xX, std::vector<double> yY, std::vector<double> zZ);
+// Declaração de funções adicionais criadas
+std::tuple<std::vector<float>, std::vector<float>, std::vector<float>> BezierCurves(float t_step, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 p4);
 glm::mat4 RodriguesMatrix (glm::vec3 vv, float c, float s);
 void Reset_game();
+void TextRendering_ShowScore(GLFWwindow* window, int score);
+
 
 // Declaração de funções auxiliares para renderizar texto dentro da janela
 // OpenGL. Estas funções estão definidas no arquivo "textrendering.cpp".
@@ -151,6 +156,7 @@ void TextRendering_ShowModelViewProjection(GLFWwindow* window, glm::mat4 project
 void TextRendering_ShowEulerAngles(GLFWwindow* window);
 void TextRendering_ShowProjection(GLFWwindow* window);
 void TextRendering_ShowFramesPerSecond(GLFWwindow* window);
+
 
 // Funções callback para comunicação com o sistema operacional e interação do
 // usuário. Veja mais comentários nas definições das mesmas, abaixo.
@@ -202,20 +208,6 @@ float g_CameraTheta = 0.0f; // Ângulo no plano ZX em relação ao eixo Z
 float g_CameraPhi = 0.0f;   // Ângulo em relação ao eixo Y
 float g_CameraDistance = 10.0f; // Distância da câmera para a origem
 
-//Area de variaveis camera livre-------------------------------------------
-bool move_camera_W  = false;
-bool move_camera_A  = false;
-bool move_camera_S  = false;
-bool move_camera_D  = false;
-bool move_up        = false;
-bool move_down      = false;
-glm::vec4 camera_position_general = glm::vec4(0.0f,8.0f,0.0f,1.0f);
-//---------------------------------------------------------------------
-
-
-//Area de variaveis Disparo
-bool click = false; //tecla de tiro
-//------------------------
 
 // Variável que controla o tipo de projeção utilizada: perspectiva ou ortográfica.
 bool g_UsePerspectiveProjection = true;
@@ -239,6 +231,7 @@ GLuint g_NumLoadedTextures = 0;
 
 // Atributos Player
 int Player_Score_Count   = 0;
+int Player_Best_Score    = 0;
 float Player_Speed_mod  = 0.5f;
 struct cubo_t Player_Hitbox;
 bool isdown             = false;
@@ -252,7 +245,7 @@ std::vector<float> Alien_Models_X;
 std::vector<float> Alien_Models_Z;
 std::vector<sphere_t> Alien_Hitboxes;
 
-// Atributos bullet
+// Atributos Bullet
 int Bullet_In_Game      = 0;
 int Bullet_Qtd          = 1;
 std::vector<float> Bullet_Models_X;
@@ -264,12 +257,26 @@ std::vector<float> Bullet_view_vector_Z;
 std::vector<sphere_t> Bullet_Hitboxes;
 
 // Variáveis de tempo para animação
-float animation_t_prev;
+float animation_t_prev = 0;
 float animation_t_now = 0;
 float delta_t = 0;
 
+// Variáveis da Free Cam
+bool move_camera_W  = false;
+bool move_camera_A  = false;
+bool move_camera_S  = false;
+bool move_camera_D  = false;
+bool move_up        = false;
+bool move_down      = false;
+glm::vec4 camera_position_general = glm::vec4(0.0f,5.0f,0.0f,1.0f);
+
+
+bool click = false;             //Está ocorrendo o tiro
 bool In_Menu = true;
 bool Difficult_inc = false;
+
+
+/// MAIN
 
 int main(int argc, char* argv[])
 {
@@ -344,7 +351,28 @@ int main(int argc, char* argv[])
     LoadShadersFromFiles();
 
 
-    /// LOAD DE TEXTURAS E CONSTRUÇÃO DE OBJETOS
+/// SETUP MOVIMENTACAO BEZIER
+
+    // Primeiro definimos o iterador t. Ele irá avançar as posições dos vetores a cada frame
+    int Alien_bezier_iter = 0;
+
+    // Set dos 4 pontos de movimentação do Alien
+    glm::vec3 p1 (-200.0f, 0.0f, 45.0f);
+    glm::vec3 p2 (-50.0f, 100.0f, -120.0f);
+    glm::vec3 p3 ( 50.0f, 100.0f, 140.0f);
+    glm::vec3 p4 ( 200.0f, 0.0f, 45.0f);
+
+    // Gera uma tupla com os vetores (x,y,z) das posiçoes em que o Alien irá passar (formando uma curva de bezier)
+    std::tuple<std::vector<float>, std::vector<float>, std::vector<float>> Alien_bezier;
+    Alien_bezier = BezierCurves(0.002,p1,p2,p3,p4);
+
+    std::vector<float> Alien_bezier_X = std::get<0>(Alien_bezier);
+    std::vector<float> Alien_bezier_Y = std::get<1>(Alien_bezier);
+    std::vector<float> Alien_bezier_Z = std::get<2>(Alien_bezier);
+
+
+
+/// LOAD DE TEXTURAS E CONSTRUÇÃO DE OBJETOS
 
     LoadTextureImage("../../data/alien.png");                                                   // TextureImage0
     LoadTextureImage("../../data/material_emissive.png");                                       // TextureImage1
@@ -402,75 +430,73 @@ int main(int argc, char* argv[])
     while (!glfwWindowShouldClose(window))
     {
 
-    //try{
-            // Definimos a cor do "fundo" do framebuffer como branco.
-            glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        // Definimos a cor do "fundo" do framebuffer como branco.
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 
-            // "Pintamos" todos os pixels do framebuffer com a cor definida acima,
-            // e também resetamos todos os pixels do Z-buffer (depth buffer).
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // "Pintamos" todos os pixels do framebuffer com a cor definida acima,
+        // e também resetamos todos os pixels do Z-buffer (depth buffer).
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            // Pedimos para a GPU utilizar o programa de GPU criado acima (contendo
-            // os shaders de vértice e fragmentos).
-            glUseProgram(g_GpuProgramID);
+        // Pedimos para a GPU utilizar o programa de GPU criado acima (contendo
+        // os shaders de vértice e fragmentos).
+        glUseProgram(g_GpuProgramID);
 
-            float r;
+        float r;
 
-            if (In_Menu){
-                r = 100.0f;
-            } else {
-                r = g_CameraDistance;
-            }
+        if (In_Menu){
+            r = 100.0f;
+        } else {
+            r = g_CameraDistance;
+        }
 
-            // Computamos a posição da câmera utilizando coordenadas esféricas.  As
-            // variáveis g_CameraDistance, g_CameraPhi, e g_CameraTheta são
-            // controladas pelo mouse do usuário. Veja as funções CursorPosCallback()
-            // e ScrollCallback().
-            float y = r*sin(g_CameraPhi);
-            float z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
-            float x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
+        // Computamos a posição da câmera utilizando coordenadas esféricas.  As
+        // variáveis g_CameraDistance, g_CameraPhi, e g_CameraTheta são
+        // controladas pelo mouse do usuário. Veja as funções CursorPosCallback()
+        // e ScrollCallback().
+        float y = r*sin(g_CameraPhi);
+        float z = r*cos(g_CameraPhi)*cos(g_CameraTheta);
+        float x = r*cos(g_CameraPhi)*sin(g_CameraTheta);
 
-            // Abaixo definimos as varáveis que efetivamente definem a câmera virtual.
-            // Veja slides 195-227 e 229-234 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
-            glm::vec4 camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
-            glm::vec4 camera_menu        = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera LOOK-AT
-            glm::vec4 camera_lookat_l    = glm::vec4(0.0f,0.0f,0.0f,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
-            glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
-            glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
-            glm::vec4 w = -camera_view_vector/(norm(camera_view_vector));
-            glm::vec4 u = crossproduct(camera_up_vector, camera_view_vector)/(norm(crossproduct(camera_up_vector, camera_view_vector)));
+        // Abaixo definimos as varáveis que efetivamente definem a câmera virtual.
+        // Veja slides 195-227 e 229-234 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
+        glm::vec4 camera_position_c  = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera
+        glm::vec4 camera_menu        = glm::vec4(x,y,z,1.0f); // Ponto "c", centro da câmera LOOK-AT
+        glm::vec4 camera_lookat_l    = glm::vec4(0.0f,0.0f,0.0f,1.0f); // Ponto "l", para onde a câmera (look-at) estará sempre olhando
+        glm::vec4 camera_view_vector = camera_lookat_l - camera_position_c; // Vetor "view", sentido para onde a câmera está virada
+        glm::vec4 camera_up_vector   = glm::vec4(0.0f,1.0f,0.0f,0.0f); // Vetor "up" fixado para apontar para o "céu" (eito Y global)
+        glm::vec4 w = -camera_view_vector/(norm(camera_view_vector));
+        glm::vec4 u = crossproduct(camera_up_vector, camera_view_vector)/(norm(crossproduct(camera_up_vector, camera_view_vector)));
 
-            // Computamos a matriz "View" utilizando os parâmetros da câmera para
-            // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
-            glm::mat4 view;
+        // Computamos a matriz "View" utilizando os parâmetros da câmera para
+        // definir o sistema de coordenadas da câmera.  Veja slides 2-14, 184-190 e 236-242 do documento Aula_08_Sistemas_de_Coordenadas.pdf.
+        glm::mat4 view;
 
-            if (In_Menu){
-                view = Matrix_Camera_View(camera_menu, camera_view_vector, camera_up_vector); //  CHAMADA TIPO LOOK-AT
+        if (In_Menu){
+            view = Matrix_Camera_View(camera_menu, camera_view_vector, camera_up_vector); //  CHAMADA TIPO LOOK-AT
+        } else {
+            view = Matrix_Camera_View(camera_position_general, camera_view_vector, camera_up_vector); //  CHAMADA TIPO FREECAM
+        }
 
-            } else {
-                view = Matrix_Camera_View(camera_position_general, camera_view_vector, camera_up_vector); //  CHAMADA TIPO FREECAM
-            }
+        // Agora computamos a matriz de Projeção.
+        glm::mat4 projection;
 
-            // Agora computamos a matriz de Projeção.
-            glm::mat4 projection;
+        // Note que, no sistema de coordenadas da câmera, os planos near e far
+        // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
+        float nearplane = -0.1f;  // Posição do "near plane"
+        float farplane  = -10.0f*40; // Posição do "far plane"
 
-            // Note que, no sistema de coordenadas da câmera, os planos near e far
-            // estão no sentido negativo! Veja slides 176-204 do documento Aula_09_Projecoes.pdf.
-            float nearplane = -0.1f;  // Posição do "near plane"
-            float farplane  = -10.0f*40; // Posição do "far plane"
+        // Projeção Perspectiva.
+        // Para definição do field of view (FOV), veja slides 205-215 do documento Aula_09_Projecoes.pdf.
+        float field_of_view = 3.141592 / 3.0f;
+        projection = Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
 
-            // Projeção Perspectiva.
-            // Para definição do field of view (FOV), veja slides 205-215 do documento Aula_09_Projecoes.pdf.
-            float field_of_view = 3.141592 / 3.0f;
-            projection = Matrix_Perspective(field_of_view, g_ScreenRatio, nearplane, farplane);
+        glm::mat4 model = Matrix_Identity(); // Transformação identidade de modelagem
 
-            glm::mat4 model = Matrix_Identity(); // Transformação identidade de modelagem
-
-            // Enviamos as matrizes "view" e "projection" para a placa de vídeo
-            // (GPU). Veja o arquivo "shader_vertex.glsl", onde estas são
-            // efetivamente aplicadas em todos os pontos.
-            glUniformMatrix4fv(g_view_uniform       , 1 , GL_FALSE , glm::value_ptr(view));
-            glUniformMatrix4fv(g_projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
+        // Enviamos as matrizes "view" e "projection" para a placa de vídeo
+        // (GPU). Veja o arquivo "shader_vertex.glsl", onde estas são
+        // efetivamente aplicadas em todos os pontos.
+        glUniformMatrix4fv(g_view_uniform       , 1 , GL_FALSE , glm::value_ptr(view));
+        glUniformMatrix4fv(g_projection_uniform , 1 , GL_FALSE , glm::value_ptr(projection));
 
             #define SPHERE 0
             #define PLANE  2
@@ -489,8 +515,8 @@ int main(int argc, char* argv[])
             }
             glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, SPHERE);
-            glDisable(GL_CULL_FACE);  //ajustando normais
-            glDisable(GL_DEPTH_TEST); //desabilitando z buffer
+            glDisable(GL_CULL_FACE);                    //ajustando normais
+            glDisable(GL_DEPTH_TEST);                   //desabilitando z buffer
             DrawVirtualObject("the_sphere");
             glEnable(GL_CULL_FACE);
             glEnable(GL_DEPTH_TEST);
@@ -505,18 +531,38 @@ int main(int argc, char* argv[])
 
         if(In_Menu){
 
-            /// RENDERIZAÇÃO DO TITULO
+        /// RENDERIZAÇÃO DO TITULO
 
-            model = Matrix_Translate(0.0f,12.0f,0.0f) * Matrix_Scale(20.0f, 20.0f, 20.0f) * Matrix_Rotate_X(1.54f) * Matrix_Rotate_Z((float)glfwGetTime() * 0.1f);
+            model = Matrix_Translate(0.0f,12.0f,0.0f) * Matrix_Scale(20.0f, 20.0f, 20.0f)* Matrix_Rotate_X(1.54f);
             glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
             glUniform1i(g_object_id_uniform, TITLE);
             DrawVirtualObject("title");
 
-            TextRendering_PrintString(window,"Press ENTER", -0.2f, -0.2f, 2.0f);
+
+        /// RENDERIZAÇÃO DO ALIEN (BEZIER)
+
+            model = Matrix_Translate(Alien_bezier_X[Alien_bezier_iter],
+                                     Alien_bezier_Y[Alien_bezier_iter],
+                                     Alien_bezier_Z[Alien_bezier_iter])*
+            Matrix_Rotate_Z(1.54f)*
+            Matrix_Scale(20.0f,20.0f,20.0f);
+
+            glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+            glUniform1i(g_object_id_uniform, ALIEN);
+            DrawVirtualObject("object_0");
+
+
+        /// INFORMAÇÕES NA TELA
+
+            TextRendering_PrintString(window,"Press ENTER", -0.2f, -0.2f, 3.0f);
             TextRendering_PrintString(window,"[W A S D] -> Move", -0.4f, -0.4f, 2.0f);
             TextRendering_PrintString(window,"[MOUSE LEFT] -> Shoot", -0.4f, -0.5f, 2.0f);
             TextRendering_PrintString(window,"[MOUSE RIGHT] -> Aim", -0.4f, -0.6f, 2.0f);
-            TextRendering_PrintString(window,"[space] -> Jump", -0.4f, -0.7f, 2.0f);
+            TextRendering_PrintString(window,"[SPACE] -> Jump", -0.4f, -0.7f, 2.0f);
+
+            TextRendering_ShowScore(window, Player_Best_Score);
+
+            // Aqui ocorre a renderização in game
         } else {
 
 
@@ -573,11 +619,6 @@ int main(int argc, char* argv[])
                 s.radius = 5;
                 Alien_Hitboxes.push_back(s);
 
-                //model = Matrix_Translate(Alien_Models_X[d], 10.0f, Alien_Models_Z[d]) * Matrix_Scale(5.0f, 5.0f, 5.0f);
-                //glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-                //glUniform1i(g_object_id_uniform, SPHERE);
-                //DrawVirtualObject("the_sphere");
-
                 // Deslocamento em direcao ao Player
                 Alien_Models_X[d] += (camera_position_general.x - Alien_Models_X[d]) * Alien_speed_mod * delta_t;
                 Alien_Models_Z[d] += (camera_position_general.z - Alien_Models_Z[d]) * Alien_speed_mod * delta_t;
@@ -586,9 +627,8 @@ int main(int argc, char* argv[])
 
         /// RENDERIZAÇÃO DO MODELO DA BALA
 
-
-            // Confere se a bullet já saiu do cenário
-                // Caso sim, deleta sua posicao
+        // Confere se a bullet já saiu do cenário
+            // Caso sim, deleta sua posicao
 
                 for (int b = 0; b < Bullet_In_Game; b++){
 
@@ -607,11 +647,11 @@ int main(int argc, char* argv[])
                     }
                 }
 
-            //Caso exista disparo, gera uma nova bullet
+        //Caso exista disparo, gera uma nova bullet
             if (click){
 
-                // Gera uma nova posicao inicial de bullet se a quantidade de bullets no jogo for menor que o desejado
-                // Guarda esta posicao (Matrix_Translate) em Bullet_Models
+            // Gera uma nova posicao inicial de bullet se a quantidade de bullets no jogo for menor que o desejado
+            // Guarda esta posicao (Matrix_Translate) em Bullet_Models
                 while (Bullet_In_Game < Bullet_Qtd){
 
                     Bullet_Models_X.push_back(camera_position_general.x + 1.1f);
@@ -625,13 +665,13 @@ int main(int argc, char* argv[])
                 }
             }
 
-            //Desenha todas as balas "instanciadas"
+        //Desenha todas as balas "instanciadas"
             for (int b = 0; b < Bullet_In_Game; b++){
 
                 model = Matrix_Translate(Bullet_Models_X[b] ,Bullet_Models_Y[b], Bullet_Models_Z[b])
                 * Matrix_Scale(0.3f,0.3f,0.3f);
 
-                // Deslocamento da bala
+            // Deslocamento da bala
                 Bullet_Models_X[b] += ( Bullet_view_vector_X[b]) * delta_t * 40;
                 Bullet_Models_Y[b] += ( Bullet_view_vector_Y[b]) * delta_t * 40;
                 Bullet_Models_Z[b] += ( Bullet_view_vector_Z[b]) * delta_t * 40;
@@ -645,12 +685,8 @@ int main(int argc, char* argv[])
                 s.position = glm::vec3 (Bullet_Models_X[b], Bullet_Models_Y[b], Bullet_Models_Z[b]);
                 s.radius = 1;
                 Bullet_Hitboxes.push_back(s);
-
-             //   model = Matrix_Translate(s.position.x, s.position.y, s.position.z) * Matrix_Scale(1.0f, 1.0f, 1.0f);
-             //   glUniformMatrix4fv(g_model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
-             //   glUniform1i(g_object_id_uniform, SPHERE);
-             //   DrawVirtualObject("the_sphere");
             }
+
 
         /// RENDERIZAÇÃO DO HUD (MIRA) NA TELA
 
@@ -664,30 +700,30 @@ int main(int argc, char* argv[])
         /// MOVIMENTAÇÃO PLAYER
 
             if(move_camera_W){
-                camera_position_general.x -= w.x * Player_Speed_mod;
-                camera_position_general.z -= w.z * Player_Speed_mod;
+                camera_position_general.x -= w.x * delta_t * 40.0f;
+                camera_position_general.z -= w.z * delta_t * 40.0f;
             }
             if(move_camera_A)
-                camera_position_general += u * Player_Speed_mod;
+                camera_position_general += u * delta_t * 40.0f;
 
             if(move_camera_S){
-                camera_position_general.x += w.x * Player_Speed_mod;
-                camera_position_general.z += w.z * Player_Speed_mod;
+                camera_position_general.x += w.x * delta_t * 40.0f;
+                camera_position_general.z += w.z * delta_t * 40.0f;
             }
             if(move_camera_D)
-                camera_position_general -= u * Player_Speed_mod;
+                camera_position_general -= u * delta_t * 40.0f;
 
             if(camera_position_general.y >= 30.0f){
                 isdown=true;
             }
 
             if(move_up && !isdown)
-                camera_position_general.y += camera_up_vector.y * 2.0f;
+                camera_position_general.y += (camera_up_vector.y * 2.0f) * delta_t * 80.0f;
 
 
        /// TESTES DE COLISÃO
 
-            // Atualizacao da hitbox player
+        // Atualizacao da hitbox do player
             Player_Hitbox.depth = 2.0f;
             Player_Hitbox.height = 2.0f;
             Player_Hitbox.width = 2.0f;
@@ -695,14 +731,16 @@ int main(int argc, char* argv[])
             Player_Hitbox.position.y = camera_position_general.y;
             Player_Hitbox.position.z = camera_position_general.z;
 
-            // Teste do player com o chao
+        // Teste do player com o chao
             if (!ColisaoPontoPlano(camera_position_general.y,-1.0f)){
-                camera_position_general += -camera_up_vector * 0.5f;
+                camera_position_general += -camera_up_vector * delta_t * 25.0f;
             }else{
                 isdown = false;
             }
 
+        // Testes dos aliens com as bullets e o player
             for (int alien = 0; alien < Alien_In_Game; alien++ ){
+
 
                 if(Bullet_In_Game != 0){
                     for (int bullet = 0; bullet < Bullet_In_Game; bullet++ ){
@@ -717,21 +755,35 @@ int main(int argc, char* argv[])
 
                             Alien_Models_X.insert(Alien_Models_X.begin() + alien, spawn_x);
                             Alien_Models_Z.insert(Alien_Models_Z.begin() + alien, spawn_z);
-                            //Alien_Hitboxes.erase(Alien_Hitboxes.begin() + alien);
 
+                        // Aumenta a pontuacao e permite a dificuldade aumentar
                             Player_Score_Count++;
                             Difficult_inc = true;
-                            Alien_In_Game=0; //forçar tambem evita bugs
+                            //Alien_In_Game = 0;        //FORÇAR ISSO EVITA BUGS
                         }
                     }
                 }
+
             // Se houver colisao entre algum alien e o player, volta para o Menu
                 if (ColisaoCuboEsfera(Player_Hitbox, &Alien_Hitboxes[alien])){
+
+                    /// FIM DE JOGO
+
+                    if (Player_Best_Score < Player_Score_Count){
+                        Player_Best_Score = Player_Score_Count;
+                    }
+                // Sleep (para evitar glitchs na tela)
+                    std::this_thread::sleep_for( std::chrono::microseconds( 500000 ) );
+
+                // Set das variaveis globais para recomeçar o jogo
                     Reset_game();
                 }
 
+        // fim dos testes dos aliens
             }
-            Alien_Hitboxes.clear();   //limpa o vetor com as posições antigas , para adicionar as novas depois
+
+        // Limpa os vetores de hitbox antigos para poder gerar as novas
+            Alien_Hitboxes.clear();
             Bullet_Hitboxes.clear();
 
 
@@ -743,7 +795,7 @@ int main(int argc, char* argv[])
                     Bullet_Qtd += 1;
                 }
 
-                //Alien_Spawn_Min_Range -= 4.0f;
+                Alien_Spawn_Min_Range -= 1.0f;
                 Alien_speed_mod += 0.05f;
                 Player_Speed_mod += 0.1f;
 
@@ -751,19 +803,18 @@ int main(int argc, char* argv[])
             }
 
 
-            // Imprime na tela informações
+        // Imprime na tela informações
             TextRendering_ShowFramesPerSecond(window);
+            TextRendering_ShowScore(window, Player_Score_Count);
 
-            static char  scores_buffer[20] = " Kills: ???";
-            static int   numchars = 7;
+    // Fim do laço da logica in game
+        }
 
-            numchars = snprintf(scores_buffer, 20, "Score:: %d", Player_Score_Count);
-
-            float lineheight = TextRendering_LineHeight(window);
-            float charwidth = TextRendering_CharWidth(window);
-
-            TextRendering_PrintString(window, scores_buffer, -0.7f-(numchars + 1)*charwidth, -0.7f-lineheight, 2.0f);
-
+    // Atualiza o Alien_bezier_iter para a renderização do alien do Menu
+        if (Alien_bezier_iter > Alien_bezier_X.size()){
+            Alien_bezier_iter = 0;
+        } else {
+            Alien_bezier_iter++;
         }
 
 
@@ -781,7 +832,7 @@ int main(int argc, char* argv[])
     // pela biblioteca GLFW.
     glfwPollEvents();
 
-    } /// While da tela
+    } /// Fim do While da tela
 
     // Finalizamos o uso dos recursos do sistema operacional
     glfwTerminate();
@@ -1319,22 +1370,22 @@ glm::mat4 RodriguesMatrix (glm::vec3 v, float c, float s){
 /// >> FONTE <<
 /// https://medium.com/geekculture/2d-and-3d-b%C3%A9zier-curves-in-c-499093ef45a9
 
-std::tuple<std::vector<double>, std::vector<double>, std::vector<double>> BezierCurves(std::vector<double> xX, std::vector<double> yY, std::vector<double> zZ)
+std::tuple<std::vector<float>, std::vector<float>, std::vector<float>> BezierCurves(float t_step, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 p4)
 {
 
-    std::vector<double> bCurveX;
-    std::vector<double> bCurveY;
-    std::vector<double> bCurveZ;
-    double bCurveXt;
-    double bCurveYt;
-    double bCurveZt;
+    std::vector<float> bCurveX;
+    std::vector<float> bCurveY;
+    std::vector<float> bCurveZ;
+    float bCurveXt;
+    float bCurveYt;
+    float bCurveZt;
 
-    for (double t = 0.01; t <= 1; t += 0.02)
+    for (float t = 0; t <= 1; t += t_step)
     {
 
-        bCurveXt = std::pow((1 - t), 3) * xX[0] + 3 * std::pow((1 - t), 2) * t * xX[1] + 3 * std::pow((1 - t), 1) * std::pow(t, 2) * xX[2] + std::pow(t, 3) * xX[3];
-        bCurveYt = std::pow((1 - t), 3) * yY[0] + 3 * std::pow((1 - t), 2) * t * yY[1] + 3 * std::pow((1 - t), 1) * std::pow(t, 2) * yY[2] + std::pow(t, 3) * yY[3];
-        bCurveZt = std::pow((1 - t), 3) * yY[0] + 3 * std::pow((1 - t), 2) * t * yY[1] + 3 * std::pow((1 - t), 1) * std::pow(t, 2) * yY[2] + std::pow(t, 3) * yY[3];
+        bCurveXt = std::pow((1 - t), 3) * p1.x + 3 * std::pow((1 - t), 2) * t * p2.x + 3 * std::pow((1 - t), 1) * std::pow(t, 2) * p3.x + std::pow(t, 3) * p4.x;
+        bCurveYt = std::pow((1 - t), 3) * p1.y + 3 * std::pow((1 - t), 2) * t * p2.y + 3 * std::pow((1 - t), 1) * std::pow(t, 2) * p3.y + std::pow(t, 3) * p4.y;
+        bCurveZt = std::pow((1 - t), 3) * p1.z + 3 * std::pow((1 - t), 2) * t * p2.z + 3 * std::pow((1 - t), 1) * std::pow(t, 2) * p3.z + std::pow(t, 3) * p4.z;
 
         bCurveX.push_back(bCurveXt);
         bCurveY.push_back(bCurveYt);
@@ -1809,12 +1860,26 @@ void PrintObjModelInfo(ObjModel* model)
 // set makeprg=cd\ ..\ &&\ make\ run\ >/dev/null
 // vim: set spell spelllang=pt_br :
 
+void TextRendering_ShowScore(GLFWwindow* window, int score){
+
+    static char  scores_buffer[20];
+    static int   numchars = 7;
+
+    numchars = snprintf(scores_buffer, 20, "Score:: %d", score);
+
+    float lineheight = TextRendering_LineHeight(window);
+    float charwidth = TextRendering_CharWidth(window);
+
+    TextRendering_PrintString(window, scores_buffer, -0.7f-(numchars + 1)*charwidth, -0.7f-lineheight, 2.0f);
+
+}
+
 
 void Reset_game() {
 
     In_Menu                 = true;
     Difficult_inc           = false;
-    Player_Score_Count       = 0;
+    Player_Score_Count      = 0;
     Player_Speed_mod        = 0.5f;
     Alien_Spawn_Qtd         = 4;
     Alien_speed_mod         = 0.2f;
@@ -1836,7 +1901,7 @@ void Reset_game() {
     Alien_Models_Z.clear();
     Alien_In_Game = 0;
 
-    camera_position_general = glm::vec4(0.0f,8.0f,0.0f,1.0f);
+    camera_position_general = glm::vec4(0.0f,5.0f,0.0f,1.0f);
 
 }
 

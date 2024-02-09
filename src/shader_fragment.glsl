@@ -38,6 +38,8 @@ uniform vec4 bbox_max;
 uniform sampler2D TextureImage0;
 uniform sampler2D TextureImage1;
 uniform sampler2D TextureImage2;
+uniform sampler2D TextureImage4;
+uniform sampler2D TextureImage5;
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec4 color;
@@ -125,21 +127,23 @@ void main()
     vec3 Kd0 = texture(TextureImage0, vec2(U,V)).rgb; // alien
     vec3 Kd1 = texture(TextureImage1, vec2(U,V)).rgb; //galaxia
     vec3 Kd2 = texture(TextureImage2, vec2(U,V)).rgb; //chão
+    vec3 Kd4 = texture(TextureImage4, vec2(U,V)).rgb; //azul
+    vec3 Kd5 = texture(TextureImage5, vec2(U,V)).rgb; //vermelho
 
     // Equação de Iluminação
     float lambert = max(0,dot(n,l));
 
     if(object_id == SPHERE ){
-        color.rgb =  Kd1;
+        color.rgb = Kd1;
     }
     else if(object_id == PLANE ){
         color.rgb = Kd2;
     }
     else if(object_id == BULLET){
-        color.rgb = vec3(0.0f, 0.0f, 1.0f);
+        color.rgb = Kd4;
     }
     else if(object_id == AIM){
-        color.rgb = vec3(1.0f, 0.0f, 0.0f);
+        color.rgb = Kd5;
     }
     else if(object_id == GUN ){
         color.rgb = cor_v.rgb;

@@ -378,7 +378,8 @@ int main(int argc, char* argv[])
     LoadTextureImage("../../data/material_emissive.png");                                       // TextureImage1
     LoadTextureImage("../../data/detalhes-preto-e-branco-do-conceito-de-textura-da-lua.jpg");   // TextureImage2
     LoadTextureImage("../../data/Gun.jpg");                                                     // TextureImage3
-
+    LoadTextureImage("../../data/textura-azul.jpg");                                            // TextureImage4
+    LoadTextureImage("../../data/vermelho.jpg");                                                // TextureImage5
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
@@ -759,7 +760,7 @@ int main(int argc, char* argv[])
                         // Aumenta a pontuacao e permite a dificuldade aumentar
                             Player_Score_Count++;
                             Difficult_inc = true;
-                            //Alien_In_Game = 0;        //FORÇAR ISSO EVITA BUGS
+                            Alien_In_Game = 0;        //FORÇAR ISSO EVITA BUGS
                         }
                     }
                 }
@@ -974,6 +975,8 @@ void LoadShadersFromFiles()
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage1"), 1);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage2"), 2);
     glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage3"), 3);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage4"), 4);
+    glUniform1i(glGetUniformLocation(g_GpuProgramID, "TextureImage5"), 5);
     glUseProgram(0);
 }
 

@@ -54,10 +54,11 @@ Referente aos requisitos exigidos pela disciplina, o Space Alien Shooter possui:
 
 ### 5. **Modelos de iluminação de objetos geométricos**
 
+Foram usados ao total 2 modelos de iluminação. Estes foram:
+
 > [!NOTE]
-> - Foram usados ao total 2 modelos de iluminação.
-> - Para os aliens está sendo utilizado o modelo de Phong, que calcula a iluminação em cada ponto do objeto.
-> - Para a arma está sendo utilizado o modelo de Gouraud que calcula a iluminação em cada vertice dos triêngulos do objeto e utiliza uma interpolação para as demais áreas do triângulo.
+> - Para os aliens está sendo utilizado o modelo de Phong, que calcula a iluminação em cada ponto do objeto;
+> - Para a arma está sendo utilizado o modelo de Gouraud que calcula a iluminação em cada vertice dos triângulos do objeto e utiliza uma interpolação para as demais áreas do triângulo;
 
 <p align="center">
   <img src="/content/ilumination_exemple.png">
@@ -65,8 +66,9 @@ Referente aos requisitos exigidos pela disciplina, o Space Alien Shooter possui:
 
 ### 6. **Mapeamento de Texturas**
 
+Para o mapeamento foram feitos duas formas diferentes. Estas foram:
+
 > [!NOTE]
-> - Para o mapeamento foram feitos duas formas diferentes:
 > - Para a esfera (skybox) é realizado um mapeamento de textura esférica usando coordenadas polares. Ele calcula as coordenadas esféricas a partir do vetor normalizado que aponta do centro da esfera para o ponto na esfera.
 > - Os demais objetos utilizam coordenadas de textura que são obtidas diretamente do arquivo de textura de cada objeto.
 
@@ -101,7 +103,7 @@ Os testes de intersecção foram implementados a partir de _hitboxes_. Toda inst
 > - **Blender 3D**: Utilizado para criar os modelos do título da tela inicial e a mira (HUD) da arma laser;
 > - **Utilização de no máximo 15% de código pronto**: Função do cálculo de uma curva bezier. Este código foi um pouco modificado para possuir parâmetros que fizessem sentido em nossa aplicação. [FONTE](https://medium.com/geekculture/2d-and-3d-b%C3%A9zier-curves-in-c-499093ef45a9)
 
-### Vídeo de apresentação
+## Vídeo de apresentação
 
 
 
@@ -133,7 +135,7 @@ O projeto teve contribuições significativas de ambos integrantes do grupo, ond
 - Aumento da dificuldade ao longo do jogo;
 - Documentação, ajustes (câmeras), melhorias e "game design";
   
-### Jefferson Ruan Barcelos Godinho (00335240)
+### Jefferson Ruan Barcelos Godinho
 - Modelos de iluminação;
 - Arma (Gun). Transformações geométricas;
 - Teste de Colisão Ponto-Plano;
@@ -142,3 +144,14 @@ O projeto teve contribuições significativas de ambos integrantes do grupo, ond
 - Pulo do jogador;
 - Implementação da _SkyBox_;
 - Documentação, ajustes (câmeras), melhorias e "game design";
+
+## After-Release
+
+A visão tida pelos contribuintes do projeto não foi totalmente atingida. Além dos pontos ditos no início da seção de Processo de Desenvolvimento, existem algumas mudanças e implementações que serão feitas, independente da entrega final deste trabalho. Elas seriam:
+
+- **Mudança da geração dos alienígenas:** Coordenadas polares -> Coordenadas esféricas;
+- **Correção do armazenamento das posições dos alienígenas**: Trocar a estrutura de dados de `std::vector` para uma Classe Alien;
+- **Correção do disparo dos lasers**: O laser não saí corretamente da ponta da arma laser;
+- **Implementação da orientação correta de objetos**: Atualizar a orientação dos alienígenas e dos lasers conforme a direção do movimento (objetos "olharem" para onde estão indo);
+- **Expansão do cenário**: Carregar dinamicamente o plano do chão com a textura do planeta;
+- **Modularização do código**: Subdividir a `main.cpp` em outros arquivos, tal como criar classes e funções adequadas para o jogo;

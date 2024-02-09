@@ -55,7 +55,9 @@ Referente aos requisitos exigidos pela disciplina, o Space Alien Shooter possui:
 ### 5. **Modelos de iluminação de objetos geométricos**
 
 > [!NOTE]
-> Falar
+> Foram usados ao total 2 modelos de iluminação.
+> Para os aliens está sendo utilizado o modelo de Phong, que calcula a iluminação em cada ponto do objeto.
+> Para a arma está sendo utilizado o modelo de Gouraud que calcula a iluminação em cada vertice dos triêngulos do objeto e utiliza uma interpolação para as demais áreas do triângulo.
 
 <p align="center">
   <img src="/content/ilumination_exemple.png">

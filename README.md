@@ -55,9 +55,9 @@ Referente aos requisitos exigidos pela disciplina, o Space Alien Shooter possui:
 ### 5. **Modelos de iluminação de objetos geométricos**
 
 > [!NOTE]
-> Foram usados ao total 2 modelos de iluminação.
-> Para os aliens está sendo utilizado o modelo de Phong, que calcula a iluminação em cada ponto do objeto.
-> Para a arma está sendo utilizado o modelo de Gouraud que calcula a iluminação em cada vertice dos triêngulos do objeto e utiliza uma interpolação para as demais áreas do triângulo.
+> - Foram usados ao total 2 modelos de iluminação.
+> - Para os aliens está sendo utilizado o modelo de Phong, que calcula a iluminação em cada ponto do objeto.
+> - Para a arma está sendo utilizado o modelo de Gouraud que calcula a iluminação em cada vertice dos triêngulos do objeto e utiliza uma interpolação para as demais áreas do triângulo.
 
 <p align="center">
   <img src="/content/ilumination_exemple.png">
@@ -66,7 +66,9 @@ Referente aos requisitos exigidos pela disciplina, o Space Alien Shooter possui:
 ### 6. **Mapeamento de Texturas**
 
 > [!NOTE]
-> Falar
+> - Para o mapeamento foram feitos duas formas diferentes:
+> - Para a esfera (skybox) é realizado um mapeamento de textura esférica usando coordenadas polares. Ele calcula as coordenadas esféricas a partir do vetor normalizado que aponta do centro da esfera para o ponto na esfera.
+> - Os demais objetos utilizam coordenadas de textura que são obtidas diretamente do arquivo de textura de cada objeto.
 
 ### 7. **Animação de Movimento baseada no tempo e Curvas de Bezier**
 
@@ -110,6 +112,13 @@ Os testes de intersecção foram implementados a partir de _hitboxes_. Toda inst
 3. Realize as configurações necessárias de compilador MingW
 4. Abra o diretório e execute o arquivo `TrabalhoFinal.cbp`
 5. Clique em **Build and Run**
+
+## Execução sem compilação:
+
+1. Baixe o ZIP deste projeto;
+2. Abrir o diretório do projeto
+3. Abrir o diretório bin e consequentemente abrir a pasta Debug
+4. executar o arquivo main.exe
 
 ## Contribuições
 

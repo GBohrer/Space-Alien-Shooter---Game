@@ -759,7 +759,7 @@ int main(int argc, char* argv[])
                         // Aumenta a pontuacao e permite a dificuldade aumentar
                             Player_Score_Count++;
                             Difficult_inc = true;
-                            //Alien_In_Game = 0;        //FORÇAR ISSO EVITA BUGS
+                            Alien_In_Game = 0;        //FORÇAR ISSO EVITA BUGS
                         }
                     }
                 }

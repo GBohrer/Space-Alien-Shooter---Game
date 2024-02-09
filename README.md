@@ -103,10 +103,6 @@ Os testes de intersecção foram implementados a partir de _hitboxes_. Toda inst
 > - **Blender 3D**: Utilizado para criar os modelos do título da tela inicial e a mira (HUD) da arma laser;
 > - **Utilização de no máximo 15% de código pronto**: Função do cálculo de uma curva bezier. Este código foi um pouco modificado para possuir parâmetros que fizessem sentido em nossa aplicação. [FONTE](https://medium.com/geekculture/2d-and-3d-b%C3%A9zier-curves-in-c-499093ef45a9)
 
-## Vídeo de apresentação
-
-
-
 ## Compilação e execução da aplicação
 
 1. Baixe o ZIP deste projeto;

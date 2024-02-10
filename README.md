@@ -2,6 +2,9 @@
 
 ![menu](https://github.com/Huthee/Space-Alien-Shooter---Game/assets/89394453/4ad2a07f-c2dd-4a56-8f64-c66c2a4b60df)
 
+### Link do vídeo de apresentação do projeto:
+https://www.youtube.com/watch?v=7JetkyfgEdg&t=4s
+
 ## Sobre o Jogo
 
 Segundo o conceito de jogos _roguelike_ da [wikipédia](https://pt.wikipedia.org/wiki/Roguelike):
